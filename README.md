@@ -56,6 +56,10 @@ records it), `dummy:uniform` for dry runs.
   `benchsmith calibrate` for T4 (KL vs `reference_stats.json`, 50k held-out docs).
   Re-author with `scripts/author_schedules.py --generator <path>`; the generator
   is only needed at authoring time.
+* `suites/dialogue_v1/` — Track 3: 491 `pair_loglik` minimal pairs (pragmatic /
+  factual / social / temporal violations, length- and vocabulary-matched) plus
+  101 generative openers scored leniently by `benchsmith/checks/dialogue.py`
+  (qualitative). Out-of-distribution by design — read as a trend across the ladder.
 
 ## Writing your own
 
@@ -83,7 +87,7 @@ Programmatic authoring: `benchsmith.authoring.templates.Builder` — see
 benchsmith/
   items.py        Item / Task / Suite, JSONL IO, content hash
   scoring.py      one scorer per kind, protocol fallback
-  checks/         program checkers: schedules (T1–T3), calibration (T4)
+  checks/         program checkers: schedules (T1–T3), calibration (T4), dialogue (qualitative)
   backends/       hf (transformers), openai_compat, dummy
   runner.py       run a suite, collect per-item results + resource stats
   ledger.py       SQLite: runs, results, item history
@@ -93,12 +97,12 @@ benchsmith/
   cli.py
 scripts/author_world_model.py   reproduces suites/world_model_v1
 scripts/author_schedules.py     reproduces suites/schedules_v1 (needs the generator path)
+scripts/author_dialogue.py      reproduces suites/dialogue_v1
 tests/
 ```
 
 ## Roadmap
 
-* Track 3 (dialogue): `pair_loglik` data + lenient generative probe
 * `from-pdf --exercises`: extract solved exercises from a textbook chapter into `numeric`/`exact` items
 * llama.cpp / GGUF backend with logprobs; lm-eval-harness task exporter
 * YourBench adapter (document → `choice_generate` items) as an optional authoring backend

@@ -93,3 +93,36 @@ class Builder:
                     del self._items[key]
                     dropped += 1
         return dropped
+
+
+class PairBuilder:
+    """Authoring helper for `pair_loglik` items (context + good/bad continuation)."""
+
+    def __init__(self, task: str, seed: int = 1000, author: str | None = None):
+        self.task = task
+        self.seed = seed
+        self.rng = random.Random(seed)
+        self.author = author
+        self._items: dict[str, Item] = {}
+
+    def add(self, context: str, good: str, bad: str, violation: str, template: str,
+            notes: str | None = None, tags: list[str] | None = None) -> Item | None:
+        if good == bad:
+            return None
+        key = context + "\x1f" + good + "\x1f" + bad
+        if key in self._items:
+            return None
+        iid = f"{self.task}-{violation[:4]}-{hashlib.sha1(key.encode()).hexdigest()[:8]}"
+        it = Item(
+            id=iid, kind=Kind.PAIR_LOGLIK, prompt=context, good=good, bad=bad,
+            category=violation, tags=tags or [], notes=notes,
+            provenance=Provenance(method="template", source=template, seed=self.seed, author=self.author),
+        )
+        self._items[key] = it
+        return it
+
+    def items(self) -> list[Item]:
+        return list(self._items.values())
+
+    def counts(self) -> Counter:
+        return Counter(it.category for it in self._items.values())

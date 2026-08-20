@@ -131,6 +131,18 @@ def validate_suite(
                 top_pos = max(pos.values()) / len(items)
                 if top_pos > chance + balance_tolerance:
                     rep.errors.append(f"{task.name}: answer position imbalance {top_pos:.1%}")
+        if task.kind == Kind.PAIR_LOGLIK and items:
+            diffs = [len(it.good.split()) - len(it.bad.split()) for it in items]
+            jacc = []
+            for it in items:
+                a, b = set(it.good.lower().split()), set(it.bad.lower().split())
+                jacc.append(len(a & b) / len(a | b))
+            m.update(mean_len_diff=round(sum(diffs) / len(diffs), 2),
+                     good_longer_frac=round(sum(d > 0 for d in diffs) / len(diffs), 3),
+                     mean_vocab_jaccard=round(sum(jacc) / len(jacc), 3))
+            if abs(m["good_longer_frac"] - 0.5) > 0.25 and abs(m["mean_len_diff"]) > 0.5:
+                rep.warnings.append(f"{task.name}: good is systematically {'longer' if m['mean_len_diff'] > 0 else 'shorter'} "
+                                    f"than bad (mean diff {m['mean_len_diff']} words) — a length prior could help")
         rep.metrics[task.name] = m
 
     for iid, c in seen_ids.items():
@@ -153,5 +165,10 @@ def _check_conventions(task: Task, it, rep: Report) -> None:
             rep.errors.append(f"{task.name}: {it.id} prompt ends with space AND options start with space")
         if not it.prompt.endswith((" ", "\n")) and False in leading and not it.prompt.endswith(("'", '"', "(")):
             rep.warnings.append(f"{task.name}: {it.id} options lack a leading space after a word prompt")
+        if task.kind == Kind.PAIR_LOGLIK and len(conts) == 2:
+            g, b = conts
+            lg, lb = len(g.split()), len(b.split())
+            if abs(lg - lb) > max(3, 0.5 * min(lg, lb)):
+                rep.warnings.append(f"{task.name}: {it.id} good/bad length mismatch ({lg} vs {lb} words)")
         if any(c != c.rstrip() for c in conts):
             rep.warnings.append(f"{task.name}: {it.id} option has trailing whitespace")

@@ -1,0 +1,110 @@
+{
+  "suite": "dialogue",
+  "version": "1.0",
+  "content_hash": "615c49f04f96e889",
+  "frozen_at": "2026-08-20T13:20:43+00:00",
+  "git_commit": "f2a78d369bf2d64993f726f67af78d8f7fabb60c",
+  "n_items": 592,
+  "meta": {
+    "violation_types": [
+      "factual",
+      "pragmatic",
+      "social",
+      "temporal"
+    ],
+    "qualitative_tasks": [
+      "openers"
+    ]
+  },
+  "files": {
+    "pairs_factual.jsonl": {
+      "task": "pairs_factual",
+      "kind": "pair_loglik",
+      "n_items": 109,
+      "provenance": {
+        "template:fact_slot": 66,
+        "template:object_room_grid": 6,
+        "template:role_fact": 6,
+        "template:day_type_grid": 14,
+        "template:animal_grid": 5,
+        "template:month_grid": 12
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "factual": 109
+      }
+    },
+    "pairs_pragmatic.jsonl": {
+      "task": "pairs_pragmatic",
+      "kind": "pair_loglik",
+      "n_items": 160,
+      "provenance": {
+        "template:scenario_swap": 160
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "pragmatic": 160
+      }
+    },
+    "pairs_social.jsonl": {
+      "task": "pairs_social",
+      "kind": "pair_loglik",
+      "n_items": 105,
+      "provenance": {
+        "template:parent_grid": 12,
+        "template:role_grid": 24,
+        "template:role_swap": 25,
+        "template:teacher_grid": 12,
+        "template:register_swap": 10,
+        "template:shop_grid": 12,
+        "template:who_does_what": 10
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "social": 105
+      }
+    },
+    "pairs_temporal.jsonl": {
+      "task": "pairs_temporal",
+      "kind": "pair_loglik",
+      "n_items": 117,
+      "provenance": {
+        "template:sequence": 30,
+        "template:day_order": 14,
+        "template:season_order": 4,
+        "template:weekend_countdown": 5,
+        "template:day_chain_q": 6,
+        "template:day_chain_skip": 5,
+        "template:hour_grid": 22,
+        "template:meal_order": 6,
+        "template:month_order": 12,
+        "template:day_order_q": 7,
+        "template:day_chain": 6
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "temporal": 117
+      }
+    },
+    "prompts.jsonl": {
+      "task": "openers",
+      "kind": "program",
+      "n_items": 101,
+      "provenance": {
+        "hand:OPENERS": 101
+      },
+      "seeds": [],
+      "categories": {
+        "opener": 101
+      }
+    }
+  }
+}

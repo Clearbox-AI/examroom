@@ -21,9 +21,11 @@ def cmd_validate(a):
         print(f"{t:20s} n={m['n']:<5d}", end="")
         if "prior_accuracy" in m:
             print(f" chance={m['chance']:.3f} loo_prior={m['prior_accuracy']:.3f}", end="")
-            if "max_conditional" in m:
-                mc = m["max_conditional"]
-                print(f" max P(correct|shown)={mc['p_correct_given_shown']:.2f} ({mc['option']!r}, shown {mc['shown']}x)", end="")
+        if "mean_vocab_jaccard" in m:
+            print(f" len_diff={m['mean_len_diff']:+.2f} good_longer={m['good_longer_frac']:.2f} jaccard={m['mean_vocab_jaccard']:.2f}", end="")
+        if "max_conditional" in m:
+            mc = m["max_conditional"]
+            print(f" max P(correct|shown)={mc['p_correct_given_shown']:.2f} ({mc['option']!r}, shown {mc['shown']}x)", end="")
         print()
     for w in rep.warnings[:a.max_messages]:
         print("WARN ", w)
@@ -113,7 +115,7 @@ def cmd_run(a):
     for t, tv in tiers.items():
         print(f"  tiers {t:14s} " + "  ".join(f"{k}={sum(v) / len(v):.3f}" for k, v in sorted(tv.items())))
     protocols = Counter(r.protocol for r in run.results)
-    if len(protocols) > 1 or any(r.protocol != str(suite.task(r.task).kind) for r in run.results):
+    if any(r.protocol != str(suite.task(r.task).kind) for r in run.results):
         print(f"  NOTE protocol fallback used: {dict(protocols)}")
     return 0
 
@@ -201,8 +203,13 @@ def cmd_show(a):
         items = suite.items[t.name]
         print(f"== {t.name} ({len(items)} items, kind={t.kind})")
         for it in rng.sample(items, min(a.n, len(items))):
-            opts = " | ".join(f"[{o}]" if i == it.answer_idx else o for i, o in enumerate(it.options or []))
-            print(f"  {it.id}: {it.prompt!r} -> {opts}")
+            if it.options:
+                tail = " | ".join(f"[{o}]" if i == it.answer_idx else o for i, o in enumerate(it.options))
+            elif it.good:
+                tail = f"good={it.good!r} bad={it.bad!r}"
+            else:
+                tail = f"target={(it.target or '')[:60]!r} checker={it.checker}"
+            print(f"  {it.id}: {it.prompt!r} -> {tail}")
     return 0
 
 
