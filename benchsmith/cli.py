@@ -47,6 +47,7 @@ def cmd_freeze(a):
         "suite": suite.name, "version": suite.version, "content_hash": suite.content_hash(),
         "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"), "git_commit": commit,
         "n_items": len(suite),
+        "meta": suite.meta.meta,
         "files": {
             t.file: {
                 "task": t.name, "kind": str(t.kind), "n_items": len(suite.items[t.name]),
@@ -84,12 +85,13 @@ def cmd_run(a):
         k, v = kv.split("=", 1)
         kw[k] = int(v) if v.isdigit() else v
     backend = load_backend(a.backend, **kw)
+    overrides = {"max_tokens": a.max_tokens} if a.max_tokens else None
 
     def progress(i, n, r):
         if a.verbose or i % 100 == 0 or i == n:
             print(f"\r[{i}/{n}] {r.task} {r.item_id} {r.score:.0f}", end="", file=sys.stderr)
 
-    run = run_suite(suite, backend, tasks=a.task, limit=a.limit, label=a.label, progress=progress)
+    run = run_suite(suite, backend, tasks=a.task, limit=a.limit, label=a.label, progress=progress, overrides=overrides)
     backend.close()
     print(file=sys.stderr)
     if not a.dry_run:
@@ -102,6 +104,14 @@ def cmd_run(a):
     st = run.stats
     print(f"  tokens/s={st['tokens_per_second']}  wall={st['wall_seconds']}s  peak_rss={st['peak_rss_mb']}MB"
           f"  peak_device={st['peak_device_mem_mb']}MB")
+    tiers: dict[str, dict[str, list[float]]] = {}
+    for r in run.results:
+        j = r.detail.get("judge")
+        for jj in (j if isinstance(j, list) else [j]) if j else []:
+            for k, v in (jj.get("tiers") or {}).items():
+                tiers.setdefault(r.task, {}).setdefault(k, []).append(v)
+    for t, tv in tiers.items():
+        print(f"  tiers {t:14s} " + "  ".join(f"{k}={sum(v) / len(v):.3f}" for k, v in sorted(tv.items())))
     protocols = Counter(r.protocol for r in run.results)
     if len(protocols) > 1 or any(r.protocol != str(suite.task(r.task).kind) for r in run.results):
         print(f"  NOTE protocol fallback used: {dict(protocols)}")
@@ -147,6 +157,31 @@ def cmd_diff(a):
     return 0
 
 
+def cmd_calibrate(a):
+    """T4: KL between a run's sampled completions and the suite's reference_stats.json."""
+    from benchsmith.checks.calibration import calibrate
+    from benchsmith.ledger import Ledger
+
+    led = Ledger(a.ledger)
+    row = led.run(a.run_id)
+    suite = load_suite(a.suite)
+    if suite.content_hash() != row["suite_hash"]:
+        print("WARNING: suite content hash differs from the run's")
+    ref_path = suite.root / suite.meta.meta.get("reference_stats", "reference_stats.json")
+    ref = json.loads(ref_path.read_text())
+    items = {it.id: it for _, it in suite.iter_items()}
+    rep = calibrate(items, led.results(row["run_id"]), ref)
+    print(f"run {row['run_id']} {row['model']}: {rep['parsed']}/{rep['completions']} completions parsed; "
+          f"mean KL = {rep['mean_kl']}")
+    print(f"{'field':26s} {'KL':>8s} {'TV':>7s} {'n':>7s}")
+    for k, f in sorted(rep["fields"].items(), key=lambda kv: -(kv[1]["kl"] or -1)):
+        print(f"{k:26s} {f['kl'] if f['kl'] is not None else '-':>8} {f['tv'] if f['tv'] is not None else '-':>7} {f['n']:>7}")
+    if not a.dry_run:
+        led.set_metric(row["run_id"], "t4_mean_kl", rep["mean_kl"], rep)
+        print("stored as metric t4_mean_kl")
+    return 0
+
+
 def cmd_history(a):
     from benchsmith.ledger import Ledger
 
@@ -189,6 +224,7 @@ def main(argv=None):
     p.add_argument("suite"); p.add_argument("backend", help="hf:<model> | openai:<model> | dummy:uniform")
     p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8)")
     p.add_argument("--task", action="append"); p.add_argument("--limit", type=int)
+    p.add_argument("--max-tokens", type=int, help="override generation budget for every task")
     p.add_argument("--label"); p.add_argument("--ledger", default="benchsmith.sqlite")
     p.add_argument("--dry-run", action="store_true"); p.add_argument("--allow-unfrozen", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_run)
@@ -200,6 +236,10 @@ def main(argv=None):
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")
     p.add_argument("--ledger", default="benchsmith.sqlite"); p.set_defaults(fn=cmd_diff)
+
+    p = sub.add_parser("calibrate", help="T4: KL of a run's sampled schedules vs the suite's reference_stats.json")
+    p.add_argument("suite"); p.add_argument("run_id"); p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_calibrate)
 
     p = sub.add_parser("history", help="every run's result for one item")
     p.add_argument("item_id"); p.add_argument("--ledger", default="benchsmith.sqlite"); p.set_defaults(fn=cmd_history)

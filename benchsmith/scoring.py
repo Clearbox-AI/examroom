@@ -60,10 +60,21 @@ def parse_letter(text: str, n_options: int) -> int | None:
 
 
 def _sampled(item: Item, task: Task, backend: Backend, prompt: str, judge) -> tuple[float, dict]:
+    """Generate `item.samples` completions and average the judge over them.
+
+    A judge may return a float in [0, 1] or a dict {"score": float, ...}; extra
+    dict keys (e.g. per-tier breakdowns) are kept in the result detail.
+    """
     temperature = task.scoring.get("temperature", 0.0 if item.samples == 1 else 0.7)
-    outs = backend.generate(prompt, item.max_tokens, temperature, item.samples)
+    max_tokens = task.scoring.get("max_tokens", item.max_tokens)
+    outs = backend.generate(prompt, max_tokens, temperature, item.samples)
     verdicts = [judge(o) for o in outs]
-    return sum(verdicts) / len(verdicts), {"outputs": outs, "per_sample": verdicts}
+    scores = [v["score"] if isinstance(v, dict) else float(v) for v in verdicts]
+    detail: dict[str, Any] = {"outputs": outs, "per_sample": scores}
+    extras = [v for v in verdicts if isinstance(v, dict)]
+    if extras:
+        detail["judge"] = extras if len(extras) > 1 else extras[0]
+    return sum(scores) / len(scores), detail
 
 
 def score_choice_generate(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
@@ -114,7 +125,7 @@ def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict
 def score_program(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
     mod, fn = item.checker.split(":")
     checker = getattr(importlib.import_module(mod), fn)
-    return _sampled(item, task, backend, item.prompt, lambda o: float(checker(item, o)))
+    return _sampled(item, task, backend, item.prompt, lambda o: checker(item, o))
 
 
 SCORERS = {

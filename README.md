@@ -33,6 +33,8 @@ benchsmith run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-360M --label 
 benchsmith runs
 benchsmith diff <run_a> <run_b> --items            # per-task delta, fixed/broken items, p-values
 benchsmith history calendar-3b7f31fb               # one item across every run
+benchsmith run       suites/schedules_v1 hf:<ckpt> --max-tokens 1500
+benchsmith calibrate suites/schedules_v1 <run_id>  # T4: KL per field vs reference_stats.json
 benchsmith show     suites/world_model_v1 -n 10    # random sample for hand review
 ```
 
@@ -47,6 +49,13 @@ records it), `dummy:uniform` for dry runs.
 * `suites/world_model_v1/` — Track 1 of the tiny-model capability brief: 1223
   closed-set cloze probes in 5 sub-categories, scored by per-token-mean
   log-likelihood. See its README for the scoring spec.
+* `suites/schedules_v1/` — Track 2: 900 household-week prompts (300 × XML/JSON/KV)
+  sliced from held-out generator documents (seed 1000), scored programmatically
+  by `benchsmith/checks/schedules.py` (T1 parse, T2 schema, T3 the generator's
+  rules, each cited to a line of `generate_structured.py`), plus
+  `benchsmith calibrate` for T4 (KL vs `reference_stats.json`, 50k held-out docs).
+  Re-author with `scripts/author_schedules.py --generator <path>`; the generator
+  is only needed at authoring time.
 
 ## Writing your own
 
@@ -74,6 +83,7 @@ Programmatic authoring: `benchsmith.authoring.templates.Builder` — see
 benchsmith/
   items.py        Item / Task / Suite, JSONL IO, content hash
   scoring.py      one scorer per kind, protocol fallback
+  checks/         program checkers: schedules (T1–T3), calibration (T4)
   backends/       hf (transformers), openai_compat, dummy
   runner.py       run a suite, collect per-item results + resource stats
   ledger.py       SQLite: runs, results, item history
@@ -82,12 +92,12 @@ benchsmith/
   authoring/      template Builder with rebalancing
   cli.py
 scripts/author_world_model.py   reproduces suites/world_model_v1
+scripts/author_schedules.py     reproduces suites/schedules_v1 (needs the generator path)
 tests/
 ```
 
 ## Roadmap
 
-* Track 2 (schedule coherence): `program` checker + `distribution` kind (KL vs reference stats)
 * Track 3 (dialogue): `pair_loglik` data + lenient generative probe
 * `from-pdf --exercises`: extract solved exercises from a textbook chapter into `numeric`/`exact` items
 * llama.cpp / GGUF backend with logprobs; lm-eval-harness task exporter

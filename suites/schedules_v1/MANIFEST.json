@@ -1,0 +1,64 @@
+{
+  "suite": "schedules",
+  "version": "1.0",
+  "content_hash": "e1a3e1715b57a5f8",
+  "frozen_at": "2026-08-20T12:58:31+00:00",
+  "git_commit": "46872802d6e27d5b3e8ea701f04ebcdfa52d97d3",
+  "n_items": 900,
+  "meta": {
+    "generator": "/home/gillus/tiny_corpus_prep/bin/generate_structured.py",
+    "generator_commit": "3f9d389",
+    "generator_seed": 1000,
+    "training_seed": 42,
+    "prompt_index_range": [
+      0,
+      900
+    ],
+    "reference_stats": "reference_stats.json",
+    "cut_point": "after the persona block, before the first day"
+  },
+  "files": {
+    "prompts_xml.jsonl": {
+      "task": "schedule_xml",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "xml": 300
+      }
+    },
+    "prompts_json.jsonl": {
+      "task": "schedule_json",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "json": 300
+      }
+    },
+    "prompts_kv.jsonl": {
+      "task": "schedule_kv",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "kv": 300
+      }
+    }
+  }
+}

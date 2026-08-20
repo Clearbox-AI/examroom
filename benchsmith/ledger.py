@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS results (
     PRIMARY KEY (run_id, item_id)
 );
 CREATE INDEX IF NOT EXISTS results_item ON results(item_id);
+CREATE TABLE IF NOT EXISTS metrics (
+    run_id  TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+    name    TEXT NOT NULL,
+    value   REAL,
+    detail  TEXT,
+    PRIMARY KEY (run_id, name)
+);
 CREATE VIEW IF NOT EXISTS task_scores AS
     SELECT r.run_id, r.task, AVG(r.score) AS score, COUNT(*) AS n
     FROM results r GROUP BY r.run_id, r.task;
@@ -94,6 +101,15 @@ class Ledger:
     def task_scores(self, run_id: str) -> dict[str, tuple[float, int]]:
         rows = self.con.execute("SELECT task, score, n FROM task_scores WHERE run_id = ?", (run_id,))
         return {r["task"]: (r["score"], r["n"]) for r in rows}
+
+    def set_metric(self, run_id: str, name: str, value: float | None, detail: dict | None = None) -> None:
+        with self.con:
+            self.con.execute("INSERT OR REPLACE INTO metrics VALUES (?,?,?,?)",
+                             (run_id, name, value, json.dumps(detail) if detail is not None else None))
+
+    def metrics(self, run_id: str) -> dict[str, tuple[float | None, dict | None]]:
+        rows = self.con.execute("SELECT name, value, detail FROM metrics WHERE run_id = ?", (run_id,))
+        return {r["name"]: (r["value"], json.loads(r["detail"]) if r["detail"] else None) for r in rows}
 
     def item_history(self, item_id: str) -> list[sqlite3.Row]:
         """Every run's result for one item — 'did the new model fix my car-wash question?'"""

@@ -61,13 +61,25 @@ def run_suite(
     limit: int | None = None,
     label: str | None = None,
     progress: Callable[[int, int, ItemResult], None] | None = None,
+    overrides: dict | None = None,
 ) -> RunResult:
+    """Evaluate `suite` on `backend`.
+
+    `overrides` (e.g. {"max_tokens": 512}) are merged into every task's scoring
+    config for this run only; they are recorded in the run metadata and do NOT
+    affect the suite content hash.
+    """
     run = RunResult(
         run_id=uuid.uuid4().hex[:12],
         ts=datetime.now(UTC).isoformat(timespec="seconds"),
         suite=suite.name, suite_version=suite.version, suite_hash=suite.content_hash(),
         backend=backend.info.as_dict(), label=label, git_commit=_git_commit(),
     )
+    if overrides:
+        run.backend["overrides"] = dict(overrides)
+        tasks_eff = {t.name: t.model_copy(update={"scoring": {**t.scoring, **overrides}}) for t in suite.tasks}
+    else:
+        tasks_eff = {t.name: t for t in suite.tasks}
     todo = [(t, it) for t, it in suite.iter_items() if tasks is None or t.name in tasks]
     if limit:
         per_task: dict[str, int] = {}
@@ -79,7 +91,7 @@ def run_suite(
         todo = kept
     for i, (t, it) in enumerate(todo, 1):
         t0 = time.perf_counter()
-        score, detail, protocol = score_item(it, t, backend)
+        score, detail, protocol = score_item(it, tasks_eff[t.name], backend)
         r = ItemResult(t.name, it.id, score, str(protocol), detail, time.perf_counter() - t0)
         run.results.append(r)
         if progress:

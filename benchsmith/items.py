@@ -113,6 +113,8 @@ class SuiteMeta(BaseModel):
     version: str
     description: str | None = None
     tasks: list[Task]
+    # free-form provenance copied into MANIFEST.json (generator commit, seeds, …)
+    meta: dict[str, Any] = Field(default_factory=dict)
 
 
 class Suite:
