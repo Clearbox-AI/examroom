@@ -1,13 +1,13 @@
 {
   "name": "schedules",
   "version": "1.0",
-  "description": "Track 2 — schedule coherence: structure emission on the model's home format, scored programmatically (T1 parse, T2 schema, T3 generator rules) plus T4 calibration against reference_stats.json.",
+  "description": "Track 2 \u2014 schedule coherence: structure emission on the model's home format, scored programmatically (T1 parse, T2 schema, T3 generator rules) plus T4 calibration against reference_stats.json.",
   "tasks": [
     {
       "name": "schedule_xml",
       "file": "prompts_xml.jsonl",
       "kind": "program",
-      "description": "Complete a household week in XML from the persona prefix; scored T1–T3 by benchsmith.checks.schedules:score",
+      "description": "Complete a household week in XML from the persona prefix; scored T1\u2013T3 by benchsmith.checks.schedules:score",
       "scoring": {
         "temperature": 0.0
       }
@@ -16,7 +16,7 @@
       "name": "schedule_json",
       "file": "prompts_json.jsonl",
       "kind": "program",
-      "description": "Complete a household week in JSON from the persona prefix; scored T1–T3 by benchsmith.checks.schedules:score",
+      "description": "Complete a household week in JSON from the persona prefix; scored T1\u2013T3 by benchsmith.checks.schedules:score",
       "scoring": {
         "temperature": 0.0
       }
@@ -25,7 +25,7 @@
       "name": "schedule_kv",
       "file": "prompts_kv.jsonl",
       "kind": "program",
-      "description": "Complete a household week in KV from the persona prefix; scored T1–T3 by benchsmith.checks.schedules:score",
+      "description": "Complete a household week in KV from the persona prefix; scored T1\u2013T3 by benchsmith.checks.schedules:score",
       "scoring": {
         "temperature": 0.0
       }
@@ -41,6 +41,8 @@
       900
     ],
     "reference_stats": "reference_stats.json",
-    "cut_point": "after the persona block, before the first day"
+    "cut_point": "after the persona block, before the first day",
+    "leakage_check": "exact",
+    "leakage_note": "format boilerplate shares 13-grams with any generator output by design; leakage means an identical document or prompt prefix (seed disjointness)"
   }
 }

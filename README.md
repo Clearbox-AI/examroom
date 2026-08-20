@@ -36,6 +36,7 @@ benchsmith history calendar-3b7f31fb               # one item across every run
 benchsmith run       suites/schedules_v1 hf:<ckpt> --max-tokens 1500
 benchsmith calibrate suites/schedules_v1 <run_id>  # T4: KL per field vs reference_stats.json
 benchsmith show     suites/world_model_v1 -n 10    # random sample for hand review
+benchsmith leakage  suites/*_v1 --corpus data/pilot_v1/shards --ngram 13   # streaming, parquet-aware
 ```
 
 Backends: `hf:<model-or-path>` (logprobs, generation, VRAM/RSS, tok/s; options
@@ -92,7 +93,8 @@ benchsmith/
   runner.py       run a suite, collect per-item results + resource stats
   ledger.py       SQLite: runs, results, item history
   diff.py         run-vs-run comparison, Wilson CI, exact McNemar
-  validate.py     schema, dedup, balance, conventions, n-gram leakage
+  validate.py     schema, dedup, balance, conventions (+ leakage via --corpus)
+  leakage.py      streaming n-gram / exact-document overlap vs training shards
   authoring/      template Builder with rebalancing
   cli.py
 scripts/author_world_model.py   reproduces suites/world_model_v1

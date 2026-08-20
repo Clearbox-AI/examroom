@@ -84,7 +84,6 @@ def validate_suite(
     rep = Report()
     seen_ids: Counter = Counter()
     seen_content: dict[str, str] = {}
-    corpus = build_corpus_index(corpus_dir, ngram) if corpus_dir else None
 
     for task in suite.tasks:
         items = suite.items[task.name]
@@ -99,11 +98,6 @@ def validate_suite(
                 rep.errors.append(f"{task.name}: {it.id} duplicates {seen_content[key]}")
             seen_content[key] = it.id
             _check_conventions(task, it, rep)
-            if corpus is not None:
-                texts = [it.prompt] + (it.options or []) + [it.good or "", it.bad or ""]
-                hit = ngrams(" ".join(texts), ngram) & corpus
-                if hit:
-                    rep.errors.append(f"{task.name}: {it.id} shares a {ngram}-gram with the corpus")
 
         if task.kind in (Kind.CHOICE_LOGLIK, Kind.CHOICE_GENERATE) and items:
             prior, chance, top = prior_accuracy(items)
@@ -148,6 +142,14 @@ def validate_suite(
     for iid, c in seen_ids.items():
         if c > 1:
             rep.errors.append(f"duplicate id {iid} ({c}x)")
+    if corpus_dir is not None:
+        from benchsmith.leakage import check_leakage
+
+        lk = check_leakage(suite, [corpus_dir], n=ngram)
+        rep.metrics["leakage"] = {"n": ngram, "docs_scanned": lk.docs_scanned, "items_indexed": lk.items_indexed,
+                                  "items_too_short": lk.items_too_short, "items_colliding": len(lk.collisions)}
+        for iid, hits in lk.collisions.items():
+            rep.errors.append(f"leakage: {iid} shares a {ngram}-gram with {hits[0][0]}: {hits[0][1]!r}")
     return rep
 
 

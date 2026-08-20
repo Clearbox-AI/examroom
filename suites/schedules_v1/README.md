@@ -113,6 +113,16 @@ trip that returns before it departs; 5 of the 900 references fail
 a model that learned the generator's marginal will hit the same ceiling (~99.9 %
 of checks), which is fine for ladder comparisons.
 
+## Leakage
+
+`suite.json` declares `leakage_check: exact`: the format's boilerplate shares
+13-grams with *any* generator output by construction, so n-gram overlap is not
+the right test here. `benchsmith leakage suites/schedules_v1 --corpus <shards>`
+instead flags a training document that is identical to an item's reference or
+starts with an item's prompt prefix (i.e. a seed collision). Checked against a
+50k-document regeneration of the seed-42 source (superset of the 30k used for
+training): 0 collisions.
+
 ## Freeze policy
 
 `MANIFEST.json` records the content hash, generator path/commit/seed and the

@@ -18,6 +18,10 @@ def cmd_validate(a):
     rep = validate_suite(suite, min_items=a.min_items, balance_tolerance=a.balance_tolerance,
                          corpus_dir=Path(a.corpus) if a.corpus else None, ngram=a.ngram)
     for t, m in rep.metrics.items():
+        if t == "leakage":
+            print(f"leakage: {m['n']}-grams, {m['docs_scanned']} docs scanned, {m['items_indexed']} items indexed "
+                  f"({m['items_too_short']} shorter than n), {m['items_colliding']} colliding")
+            continue
         print(f"{t:20s} n={m['n']:<5d}", end="")
         if "prior_accuracy" in m:
             print(f" chance={m['chance']:.3f} loo_prior={m['prior_accuracy']:.3f}", end="")
@@ -37,6 +41,26 @@ def cmd_validate(a):
         print(f"... {len(rep.errors) - a.max_messages} more errors")
     print(f"hash={suite.content_hash()}  items={len(suite)}  {'OK' if rep.ok else 'FAILED'}")
     return 0 if rep.ok else 1
+
+
+def cmd_leakage(a):
+    from benchsmith.leakage import check_leakage
+
+    rc = 0
+    for sp in a.suite:
+        suite = load_suite(sp)
+        mode = a.mode or suite.meta.meta.get("leakage_check", "ngram")
+        rep = check_leakage(suite, [Path(c) for c in a.corpus], n=a.ngram, text_column=a.text_column, mode=mode,
+                            progress=lambda d, c: print(f"\r  {d} docs, {c} colliding items", end="", file=sys.stderr))
+        print(file=sys.stderr)
+        what = (f"{rep.items_indexed} items indexed ({rep.items_too_short} shorter than {a.ngram} words)"
+                if mode == "ngram" else f"{rep.items_indexed} items, exact document/prefix identity")
+        print(f"{suite.name}@{suite.version} [{mode}]: {rep.docs_scanned} docs scanned, {what}, {len(rep.collisions)} colliding")
+        for iid, hits in sorted(rep.collisions.items()):
+            for ref, gram in hits[: a.max_hits]:
+                print(f"  {iid}  {ref}  {gram!r}")
+        rc |= not rep.ok
+    return rc
 
 
 def cmd_freeze(a):
@@ -223,6 +247,13 @@ def main(argv=None):
     p.add_argument("--corpus", help="directory of training text for n-gram leakage check")
     p.add_argument("--ngram", type=int, default=13); p.add_argument("--max-messages", type=int, default=30)
     p.set_defaults(fn=cmd_validate)
+
+    p = sub.add_parser("leakage", help="streaming n-gram overlap check of suites against a training corpus")
+    p.add_argument("suite", nargs="+"); p.add_argument("--corpus", action="append", required=True, help="file or directory (txt/md/jsonl/parquet)")
+    p.add_argument("--ngram", type=int, default=13); p.add_argument("--text-column", default="text")
+    p.add_argument("--max-hits", type=int, default=3)
+    p.add_argument("--mode", choices=["ngram", "exact"], help="override the suite's declared check (meta.leakage_check)")
+    p.set_defaults(fn=cmd_leakage)
 
     p = sub.add_parser("freeze", help="write MANIFEST.json with content hash and provenance")
     p.add_argument("suite"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_freeze)
