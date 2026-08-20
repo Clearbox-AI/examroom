@@ -1,0 +1,27 @@
+[project]
+name = "benchsmith"
+version = "0.1.0"
+description = "Define custom, domain-specific LLM benchmarks and track regressions across models and quantizations."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+hf = ["torch", "transformers", "accelerate"]
+openai = ["openai"]
+dev = ["pytest"]
+
+[project.scripts]
+benchsmith = "benchsmith.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["benchsmith"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

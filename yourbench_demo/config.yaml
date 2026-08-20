@@ -1,0 +1,19 @@
+hf_configuration:
+  hf_dataset_name: crc-staging-bench
+  local_saving: true
+  local_dataset_dir: yourbench_demo/dataset
+  push_to_hub: false
+model_list:
+- model_name: gpt-4o-mini
+  api_key: $OPENAI_API_KEY
+  base_url: https://api.openai.com/v1
+pipeline:
+  ingestion:
+    source_documents_dir: yourbench_demo/documents
+    output_dir: yourbench_demo/ingested
+    upload_to_hub: false
+  summarization: {}
+  chunking: {}
+  single_hop_question_generation:
+    question_schema: yourbench_demo/mcq_schema.py
+  prepare_lighteval: {}

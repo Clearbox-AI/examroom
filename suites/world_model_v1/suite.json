@@ -1,0 +1,52 @@
+{
+  "name": "world_model",
+  "version": "1.0",
+  "description": "Track 1 — world-model likelihood probes for tiny models (closed-set cloze, per-token-mean logprob).",
+  "tasks": [
+    {
+      "name": "calendar",
+      "file": "calendar.jsonl",
+      "kind": "choice_loglik",
+      "description": "Calendar structure: days, months, ordering, counts, seasons of months",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "seasons_weather",
+      "file": "seasons_weather.jsonl",
+      "kind": "choice_loglik",
+      "description": "Seasons & weather: season identity, temperatures, daylight, weather–activity coupling",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "time_conventions",
+      "file": "time_conventions.jsonl",
+      "kind": "choice_loglik",
+      "description": "Everyday time conventions: meals, work/school hours, sleep, frequencies",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "physical_social",
+      "file": "physical_social.jsonl",
+      "kind": "choice_loglik",
+      "description": "Everyday physical/social facts: rooms, appliances, transport, roles",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "general_knowledge",
+      "file": "general_knowledge.jsonl",
+      "kind": "choice_loglik",
+      "description": "General knowledge control: capitals, animals, basic science (Simple-Wikipedia-like)",
+      "scoring": {
+        "normalize": "mean"
+      }
+    }
+  ]
+}

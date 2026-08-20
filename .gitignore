@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.sqlite
+logs/
+yourbench_demo/dataset/
+yourbench_demo/ingested/

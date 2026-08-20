@@ -1,0 +1,131 @@
+{
+  "suite": "world_model",
+  "version": "1.0",
+  "content_hash": "3430bfa40a625ead",
+  "frozen_at": "2026-08-20T12:16:05+00:00",
+  "git_commit": "1c357d492e621b3b9b099957cd5688a64fb1c225",
+  "n_items": 1223,
+  "files": {
+    "calendar.jsonl": {
+      "task": "calendar",
+      "kind": "choice_loglik",
+      "n_items": 303,
+      "provenance": {
+        "template:month_ordinal": 12,
+        "template:day_adjacency": 112,
+        "template:month_order": 84,
+        "template:weekday_membership": 30,
+        "template:month_season": 36,
+        "template:calendar_counts": 23,
+        "template:days_per_month": 6
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "calendar": 303
+      }
+    },
+    "seasons_weather.jsonl": {
+      "task": "seasons_weather",
+      "kind": "choice_loglik",
+      "n_items": 212,
+      "provenance": {
+        "template:season_identity+prefix": 9,
+        "template:season_identity": 52,
+        "template:weather_binary+prefix": 11,
+        "template:clothing": 16,
+        "template:weather_activity": 18,
+        "template:temperature": 15,
+        "template:weather_words": 15,
+        "template:weather_binary": 50,
+        "template:temperature+prefix": 2,
+        "template:month_weather": 17,
+        "template:weather_words+prefix": 3,
+        "template:clothing+prefix": 1,
+        "template:month_weather+prefix": 1,
+        "template:weather_activity+prefix": 2
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "seasons_weather": 212
+      }
+    },
+    "time_conventions.jsonl": {
+      "task": "time_conventions",
+      "kind": "choice_loglik",
+      "n_items": 219,
+      "provenance": {
+        "template:ordering": 12,
+        "template:frequency": 16,
+        "template:clock_time+prefix": 20,
+        "template:part_of_day+prefix": 31,
+        "template:part_of_day": 55,
+        "template:clock_time": 32,
+        "template:meal_names": 15,
+        "template:ordering+prefix": 6,
+        "template:frequency+prefix": 12,
+        "template:durations": 6,
+        "template:meal_names+prefix": 11,
+        "template:durations+prefix": 3
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "time_conventions": 219
+      }
+    },
+    "physical_social.jsonl": {
+      "task": "physical_social",
+      "kind": "choice_loglik",
+      "n_items": 212,
+      "provenance": {
+        "template:occupation+prefix": 4,
+        "template:appliance_function": 48,
+        "template:walk_or_drive": 8,
+        "template:household_roles": 12,
+        "template:travel_duration": 9,
+        "template:room_activity+prefix": 3,
+        "template:occupation": 28,
+        "template:room_activity": 25,
+        "template:transport_mode": 16,
+        "template:appliance_effect": 12,
+        "template:household_members": 12,
+        "template:distance_scale": 6,
+        "template:transport_mode+prefix": 3,
+        "template:speed_compare": 12,
+        "template:walk_or_drive+prefix": 1,
+        "template:appliance_function+prefix": 6,
+        "template:distance_scale+prefix": 2,
+        "template:speed_compare+prefix": 2,
+        "template:appliance_effect+prefix": 1,
+        "template:household_members+prefix": 2
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "physical_social": 212
+      }
+    },
+    "general_knowledge.jsonl": {
+      "task": "general_knowledge",
+      "kind": "choice_loglik",
+      "n_items": 277,
+      "provenance": {
+        "template:basic_facts": 121,
+        "template:capitals": 108,
+        "template:animal_class": 48
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "general_knowledge": 277
+      }
+    }
+  }
+}
