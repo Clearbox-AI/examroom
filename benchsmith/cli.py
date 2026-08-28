@@ -111,7 +111,8 @@ def cmd_run(a):
         k, v = kv.split("=", 1)
         kw[k] = int(v) if v.isdigit() else v
     backend = load_backend(a.backend, **kw)
-    overrides = {"max_tokens": a.max_tokens} if a.max_tokens else None
+    overrides = {k: v for k, v in {"max_tokens": a.max_tokens, "instruction": a.instruction}.items() if v}
+    overrides = overrides or None
 
     def progress(i, n, r):
         if a.verbose or i % 100 == 0 or i == n:
@@ -263,6 +264,8 @@ def main(argv=None):
     p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8)")
     p.add_argument("--task", action="append"); p.add_argument("--limit", type=int)
     p.add_argument("--max-tokens", type=int, help="override generation budget for every task")
+    p.add_argument("--instruction", help="append an instruction to every generative prompt "
+                   "(chat models: e.g. 'Answer with only the number.'); recorded in run metadata")
     p.add_argument("--label"); p.add_argument("--ledger", default="benchsmith.sqlite")
     p.add_argument("--dry-run", action="store_true"); p.add_argument("--allow-unfrozen", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_run)

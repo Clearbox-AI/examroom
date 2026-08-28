@@ -1,0 +1,64 @@
+{
+  "suite": "openstax_physics_ch2",
+  "version": "1.1",
+  "content_hash": "997a7513f5ed34d8",
+  "frozen_at": "2026-08-28T09:16:46+00:00",
+  "git_commit": "c0b89d12cfad211a14c3dfcf079d072ab99dc6ea",
+  "n_items": 46,
+  "meta": {
+    "book": "college-physics-2e",
+    "chapter": 2,
+    "source_pages": [
+      "2-problems-exercises",
+      "chapter-2"
+    ],
+    "fetched": "2026-08-28",
+    "license": "CC BY-NC-SA 4.0",
+    "attribution": "Problems and answers derived from OpenStax College Physics 2e, openstax.org/details/books/college-physics-2e, \u00a9 Rice University, CC BY-NC-SA 4.0.",
+    "exercises_on_page": 67,
+    "answered": 36
+  },
+  "files": {
+    "ch2.jsonl": {
+      "task": "ch2",
+      "kind": "numeric",
+      "n_items": 46,
+      "provenance": {
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#5": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#7": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#9": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#11": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#13": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#15": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#16": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#18": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#21": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#23": 3,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#25": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#27": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#29": 3,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#31": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#33": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#35": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#37": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#39": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#40": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#43": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#45": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#47": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#49": 1,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#51": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#53": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#55": 2,
+        "book-html:openstax:college-physics-2e/pages/2-problems-exercises#57": 3
+      },
+      "seeds": [],
+      "categories": {
+        "2.3 Time, Velocity, and Speed": 9,
+        "2.4 Acceleration": 3,
+        "2.5 Motion Equations for Constant Acceleration in One Dimension": 20,
+        "2.7 Falling Objects": 14
+      }
+    }
+  }
+}

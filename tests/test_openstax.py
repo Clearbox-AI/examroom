@@ -67,3 +67,23 @@ def test_first_number_scientific_forms():
     assert first_number("first 3 then 10") == 3          # no false ×10 join
     assert first_number("13 x 10-inch boards") == 13     # exponent needs ^
     assert first_number("no numbers") is None
+
+
+def test_numeric_scoring_policies():
+    from benchsmith.items import Item, Kind, Task
+    from benchsmith.scoring import score_numeric
+
+    class Echo:
+        def __init__(self, text): self.text = text
+        def generate(self, prompt, max_tokens, temperature, n): return [self.text] * n
+
+    task = Task(name="t", file="t.jsonl", kind=Kind.NUMERIC,
+                scoring={"abs": True, "min_rel_tol": 0.005})
+    it = Item(id="x", kind=Kind.NUMERIC, prompt="p", target="-34.689", tolerance=0.0005)
+    assert score_numeric(it, task, Echo(" 34.7 m/s"))[0] == 1.0   # magnitude + rounding floor
+    assert score_numeric(it, task, Echo(" -34.7 m/s"))[0] == 1.0
+    assert score_numeric(it, task, Echo(" 35.2 m/s"))[0] == 0.0   # outside 0.5%
+
+    strict = Task(name="t", file="t.jsonl", kind=Kind.NUMERIC, scoring={})
+    assert score_numeric(it, strict, Echo(" 34.7 m/s"))[0] == 0.0  # defaults unchanged
+    assert score_numeric(it, strict, Echo(" -34.689 m/s"))[0] == 1.0

@@ -67,6 +67,9 @@ def _sampled(item: Item, task: Task, backend: Backend, prompt: str, judge) -> tu
     """
     temperature = task.scoring.get("temperature", 0.0 if item.samples == 1 else 0.7)
     max_tokens = task.scoring.get("max_tokens", item.max_tokens)
+    instruction = task.scoring.get("instruction")
+    if instruction:  # run-time suffix for chat models that need "answer only" steering
+        prompt = f"{prompt}\n\n{instruction}"
     outs = backend.generate(prompt, max_tokens, temperature, item.samples)
     verdicts = [judge(o) for o in outs]
     scores = [v["score"] if isinstance(v, dict) else float(v) for v in verdicts]
@@ -128,13 +131,20 @@ def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict
     target = float(item.target)
     tol = item.tolerance if item.tolerance is not None else task.scoring.get("tolerance", 0.0)
     rel = task.scoring.get("relative", False)
+    # optional scoring policies (task-level):
+    #   abs: compare magnitudes — sign conventions the prompt doesn't pin down don't count
+    #   min_rel_tol: tolerance floor as a fraction of |target|, so an answer correctly
+    #   rounded to fewer digits than the reference still passes
+    use_abs = task.scoring.get("abs", False)
+    eff_tol = tol * abs(target) if rel else tol
+    eff_tol = max(eff_tol, task.scoring.get("min_rel_tol", 0.0) * abs(target))
 
     def judge(o: str) -> float:
         x = first_number(o)
         if x is None or math.isnan(x):
             return 0.0
-        err = abs(x - target)
-        return float(err <= (tol * abs(target) if rel else tol))
+        err = abs(abs(x) - abs(target)) if use_abs else abs(x - target)
+        return float(err <= eff_tol)
 
     return _sampled(item, task, backend, item.prompt, judge)
 

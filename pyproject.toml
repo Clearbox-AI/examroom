@@ -10,6 +10,7 @@ dependencies = [
 
 [project.optional-dependencies]
 hf = ["torch", "transformers", "accelerate"]
+anthropic = ["anthropic>=1"]
 openai = ["openai"]
 dev = ["pytest"]
 

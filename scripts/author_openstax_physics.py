@@ -30,6 +30,7 @@ from benchsmith.authoring.openstax import (
 from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
 
 BOOK = "college-physics-2e"
+VERSION = "1.1"
 AUTHOR = "scripts/author_openstax_physics.py"
 LICENSE = "CC BY-NC-SA 4.0"
 ATTRIBUTION = (
@@ -55,6 +56,12 @@ def build_items(chapter: int, exercises: list[Exercise], solutions: dict[int, st
                 continue
             if multi and f"({part})" not in ex.text:
                 continue  # answer has parts the problem statement does not label
+            if "=" in q.rest[1:]:
+                # another "label=value" follows: the answer is a worked solution or a
+                # knowns list, and the leading quantity may not be the final answer
+                # (a leading "=" is fine — that's the same answer converted to
+                # another unit)
+                continue
             if multi:
                 ask = f"The answer to part ({part})"
             else:
@@ -90,7 +97,7 @@ def main() -> None:
     args = ap.parse_args()
 
     ch = args.chapter
-    out = args.out or f"suites/openstax_physics_ch{ch}_v1"
+    out = args.out or f"suites/openstax_physics_ch{ch}_v{VERSION}"
     problems_slug = f"{ch}-problems-exercises"
     probs_html = fetch_page(args.book, problems_slug, args.cache)
     key_html = fetch_page(args.book, f"chapter-{ch}", args.cache)
@@ -109,13 +116,14 @@ def main() -> None:
         name=f"ch{ch}",
         file=f"ch{ch}.jsonl",
         kind=Kind.NUMERIC,
-        scoring={"temperature": 0.0},
+        scoring={"temperature": 0.0, "abs": True, "min_rel_tol": 0.005},
         description=f"OpenStax College Physics 2e chapter {ch}: first number in the "
-        "generation must be within a half-unit of the answer's last significant digit",
+        "generation, compared by magnitude (sign conventions are not pinned by the "
+        "prompts), within max(half-ulp of the book answer, 0.5%)",
     )
     meta = SuiteMeta(
         name=f"openstax_physics_ch{ch}",
-        version="1.0",
+        version=VERSION,
         description=f"Solved end-of-chapter exercises, OpenStax College Physics 2e ch. {ch}.",
         tasks=[task],
         meta={
@@ -137,7 +145,9 @@ def main() -> None:
         "depend on a figure, sketch, or graph are excluded, as are answers that do\n"
         "not parse as a single physical quantity.  Multi-part problems yield one\n"
         "item per part; the prompt names the part and the expected unit.\n\n"
-        "Tolerance is half a unit in the last significant digit of the book answer.\n\n"
+        "Scoring compares magnitudes (the prompts don't pin a sign convention) with a\n"
+        "tolerance of max(half a unit in the book answer's last significant digit, 0.5%),\n"
+        "so an answer correctly rounded to fewer digits than the reference still passes.\n\n"
         f"{ATTRIBUTION}\n\n"
         f"Authored by `{AUTHOR}`; re-running it refetches the live pages and may\n"
         "differ if OpenStax edits the book — treat the frozen version as canonical.\n"

@@ -41,9 +41,12 @@ benchsmith leakage  suites/*_v1 --corpus data/pilot_v1/shards --ngram 13   # str
 
 Backends: `hf:<model-or-path>` (logprobs, generation, VRAM/RSS, tok/s; options
 `--opt dtype=bf16 --opt quantization=4bit --opt batch_size=16`),
-`openai:<model>` (any OpenAI-compatible endpoint via `--opt base_url=…`;
-generation only, likelihood items fall back to `choice_generate` and the ledger
-records it), `dummy:uniform` for dry runs.
+`anthropic:<model>` (Claude via the native SDK; `--opt thinking=off|adaptive|none
+--opt effort=low…max`; temperature is never sent — current Claude models reject
+sampling params), `openai:<model>` (any OpenAI-compatible endpoint via
+`--opt base_url=…`), `dummy:uniform` for dry runs.  Chat backends are generation
+only: likelihood items fall back to `choice_generate` (recorded in the ledger)
+and `pair_loglik` refuses to run.
 
 ## Suites
 
@@ -111,8 +114,14 @@ OpenStax books via their HTML edition (the PDFs render answer equations as vecto
 art; the HTML has real MathML).  Problems and the odd-numbered answer key are
 joined by problem number; answers that parse as a physical quantity become
 `numeric` items with a tolerance of half a unit in the last significant digit.
-Figure-dependent problems are skipped.  See `suites/openstax_physics_ch2_v1`
-(54 items, CC BY-NC-SA 4.0 attribution in the suite metadata).
+Figure-dependent problems and worked-solution/multi-quantity answers are skipped.
+See `suites/openstax_physics_ch2_v1.1` (46 items, CC BY-NC-SA 4.0 attribution in
+the suite metadata; v1 kept frozen).  Scoring compares magnitudes with a 0.5%
+relative-tolerance floor (`abs` / `min_rel_tol` task scoring options) so unpinned
+sign conventions and correct rounding don't count as errors.  For chat backends,
+run with `--instruction "Give only the final numeric answer …"` and
+`--opt thinking=adaptive --opt effort=low --max-tokens 3000`; Claude Sonnet 5
+baseline: 0.957.
 
 ## Roadmap
 

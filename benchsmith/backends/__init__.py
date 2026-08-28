@@ -11,6 +11,7 @@ def load_backend(spec: str, **kwargs) -> Backend:
     Examples:
         hf:HuggingFaceTB/SmolLM2-135M
         hf:/path/to/checkpoint
+        anthropic:claude-sonnet-5     (needs ANTHROPIC_API_KEY or an `ant auth` profile)
         openai:gpt-4o-mini            (needs OPENAI_API_KEY / --base-url)
         dummy:uniform                 (for tests; deterministic pseudo-random scores)
     """
@@ -20,6 +21,9 @@ def load_backend(spec: str, **kwargs) -> Backend:
     if kind == "hf":
         from benchsmith.backends.hf import HFBackend
         return HFBackend(model, **kwargs)
+    if kind == "anthropic":
+        from benchsmith.backends.anthropic_api import AnthropicBackend
+        return AnthropicBackend(model, **kwargs)
     if kind == "openai":
         from benchsmith.backends.openai_compat import OpenAICompatBackend
         return OpenAICompatBackend(model, **kwargs)
