@@ -99,12 +99,29 @@ def score_regex(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
     return _sampled(item, task, backend, item.prompt, lambda o: float(rx.search(o) is not None))
 
 
-_NUM = re.compile(r"[-+]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
+_SUP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")
+_NUM = re.compile(
+    r"(?P<ten_s>[-+]?)10\s*(?:\^|\*\*)\s*\{?(?P<ten_e>[-+]?\d+)\}?"          # bare 10^n
+    r"|(?P<mant>[-+]?\d[\d,]*(?:\.\d+)?)"
+    r"(?:\s*(?:[×*·]|\\times|[xX])\s*10\s*(?:\^|\*\*)\s*\{?(?P<pexp>[-+]?\d+)\}?"  # a × 10^n
+    r"|[eE](?P<eexp>[-+]?\d+))?"                                             # a e n
+)
 
 
 def first_number(text: str) -> float | None:
+    text = text.replace("−", "-")
+    text = re.sub(  # 10⁴ -> 10^4 so scientific notation survives
+        r"10\s*([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)", lambda m: "10^" + m.group(1).translate(_SUP), text
+    )
     m = _NUM.search(text)
-    return float(m.group().replace(",", "")) if m else None
+    if not m:
+        return None
+    if m.group("ten_e") is not None:
+        v = 10.0 ** int(m.group("ten_e"))
+        return -v if m.group("ten_s") == "-" else v
+    v = float(m.group("mant").replace(",", ""))
+    exp = m.group("pexp") or m.group("eexp")
+    return v * 10.0 ** int(exp) if exp else v
 
 
 def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:

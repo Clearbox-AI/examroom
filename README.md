@@ -100,11 +100,22 @@ benchsmith/
 scripts/author_world_model.py   reproduces suites/world_model_v1
 scripts/author_schedules.py     reproduces suites/schedules_v1 (needs the generator path)
 scripts/author_dialogue.py      reproduces suites/dialogue_v1
+scripts/author_openstax_physics.py  numeric items from OpenStax solved exercises (--chapter N)
 tests/
 ```
 
+## Suites from textbooks
+
+`benchsmith/authoring/openstax.py` extracts solved end-of-chapter exercises from
+OpenStax books via their HTML edition (the PDFs render answer equations as vector
+art; the HTML has real MathML).  Problems and the odd-numbered answer key are
+joined by problem number; answers that parse as a physical quantity become
+`numeric` items with a tolerance of half a unit in the last significant digit.
+Figure-dependent problems are skipped.  See `suites/openstax_physics_ch2_v1`
+(54 items, CC BY-NC-SA 4.0 attribution in the suite metadata).
+
 ## Roadmap
 
-* `from-pdf --exercises`: extract solved exercises from a textbook chapter into `numeric`/`exact` items
+* more book adapters (CLP problem books via PDF glyph decoding; arbitrary PDFs via LLM-assisted extraction)
 * llama.cpp / GGUF backend with logprobs; lm-eval-harness task exporter
 * YourBench adapter (document → `choice_generate` items) as an optional authoring backend
