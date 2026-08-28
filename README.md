@@ -33,6 +33,7 @@ benchsmith run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-360M --label 
 benchsmith runs
 benchsmith diff <run_a> <run_b> --items            # per-task delta, fixed/broken items, p-values
 benchsmith history calendar-3b7f31fb               # one item across every run
+benchsmith report                                  # self-contained report.html: browse runs, outputs, item history, 2-run compare
 benchsmith run       suites/schedules_v1 hf:<ckpt> --max-tokens 1500
 benchsmith calibrate suites/schedules_v1 <run_id>  # T4: KL per field vs reference_stats.json
 benchsmith show     suites/world_model_v1 -n 10    # random sample for hand review

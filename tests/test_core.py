@@ -140,3 +140,27 @@ def test_generative_fallback_for_backend_without_logprobs(tmp_path):
     be.supports_logprobs = False
     r = run_suite(s, be, limit=3)
     assert all(x.protocol == "choice_generate" for x in r.results)
+
+
+def test_report_renders(tmp_path):
+    import json
+    from benchsmith.ledger import Ledger
+    from benchsmith.report import render_report
+    from benchsmith.runner import ItemResult, RunResult
+
+    led = Ledger(tmp_path / "l.sqlite")
+    for rid, score in [("run-a", 1.0), ("run-b", 0.0)]:
+        led.record(RunResult(
+            run_id=rid, ts=f"2026-08-28T10:00:0{score:.0f}", suite="s", suite_version="1.0",
+            suite_hash="h" * 16, backend={"backend": "dummy", "model": "m"},
+            stats={"tokens_per_second": 10.0}, label=rid, git_commit=None,
+            results=[ItemResult("t", "item-1", score, "numeric",
+                                {"outputs": ["x" * 5000], "per_sample": [score]}, 0.1)]))
+    out = render_report(led, tmp_path / "r.html")
+    html = out.read_text()
+    assert "run-a" in html and "run-b" in html and "item-1" in html
+    payload = html.split('type="application/json">')[1].split("</script>")[0]
+    data = json.loads(payload.replace("<\\/", "</"))
+    assert len(data["runs"]) == 2
+    (item,) = data["runs"][0]["items"]
+    assert "truncated" in item["outputs"][0] and len(item["outputs"][0]) < 2200

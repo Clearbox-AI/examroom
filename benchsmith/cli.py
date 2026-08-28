@@ -217,6 +217,17 @@ def cmd_history(a):
     return 0
 
 
+def cmd_report(a):
+    from benchsmith.ledger import Ledger
+    from benchsmith.report import render_report
+
+    ledger = Ledger(a.ledger)
+    out = render_report(ledger, a.out, suite=a.suite)
+    n = len(ledger.runs(suite=a.suite))
+    print(f"wrote {out} ({n} runs) — open it in a browser")
+    return 0
+
+
 def cmd_show(a):
     import random
 
@@ -284,6 +295,12 @@ def main(argv=None):
 
     p = sub.add_parser("history", help="every run's result for one item")
     p.add_argument("item_id"); p.add_argument("--ledger", default="benchsmith.sqlite"); p.set_defaults(fn=cmd_history)
+
+    p = sub.add_parser("report", help="render the ledger as a self-contained HTML page")
+    p.add_argument("--out", default="report.html")
+    p.add_argument("--suite", help="only include runs of this suite")
+    p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.set_defaults(fn=cmd_report)
 
     p = sub.add_parser("show", help="print a random sample of items for review")
     p.add_argument("suite"); p.add_argument("--task", action="append"); p.add_argument("-n", type=int, default=8)
