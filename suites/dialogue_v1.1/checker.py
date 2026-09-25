@@ -1,5 +1,8 @@
 """Track 3 — lenient, QUALITATIVE scorer for generated dialogue replies.
 
+Suite-local checker (checker = "./checker.py:score"): frozen with the suite
+and covered by its content hash.
+
 Prompt: "A: <opener>\nB:". Scores the continuation on four cheap signals and
 returns their mean; use only for trends across the ladder, not as a headline.
 

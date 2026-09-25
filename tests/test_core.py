@@ -4,12 +4,13 @@ from pathlib import Path
 import pytest
 
 from benchsmith.authoring.templates import Builder
+from benchsmith.backends.base import BackendInfo, Stats
 from benchsmith.backends.dummy import DummyBackend
 from benchsmith.diff import diff_runs, mcnemar_exact_p, wilson
 from benchsmith.items import Item, Kind, SuiteMeta, Task, load_suite, save_suite
 from benchsmith.ledger import Ledger
 from benchsmith.runner import run_suite
-from benchsmith.scoring import first_number, parse_letter, score_item
+from benchsmith.scoring import first_number, last_number, load_checker, parse_letter, score_item
 from benchsmith.validate import prior_accuracy, validate_suite
 
 
@@ -99,6 +100,9 @@ def test_scoring_helpers():
     assert parse_letter("b", 4) == 1
     assert parse_letter("Banana", 4) is None
     assert first_number("about 1,234.5 km") == 1234.5
+    assert first_number(".69") == 0.69 and first_number("x = .5e2") == 50.0
+    assert last_number("In Study 2, the rate was 41.6%.") == 41.6
+    assert last_number("no digits") is None
 
 
 def test_run_ledger_diff(tmp_path):
@@ -127,11 +131,113 @@ def test_length_normalisation_matters():
     assert det_mean["tie"]  # equal per-token logprob -> tie, counted as wrong
 
 
+def test_numeric_answer_prefix():
+    from benchsmith.scoring import score_numeric
+
+    class Echo:
+        def __init__(self, text): self.text = text
+        def generate(self, prompt, max_tokens, temperature, n): return [self.text] * n
+
+    task = Task(name="t", file="f", kind=Kind.NUMERIC, scoring={"answer_prefix": "ANSWER:"})
+    it = Item(id="x", kind=Kind.NUMERIC, prompt="p", target="50.3", tolerance=0.05)
+    assert score_numeric(it, task, Echo("144/228 = 63.2%, so...\nAnswer: 50.3"))[0] == 1.0
+    assert score_numeric(it, task, Echo("50.3"))[0] == 1.0          # no marker: first-number fallback
+    assert score_numeric(it, task, Echo("first 7 then ANSWER: 50.3"))[0] == 1.0
+    assert score_numeric(it, task, Echo("144/228, ANSWER: 63.2"))[0] == 0.0
+
+
+def test_numeric_policies_prefix_list_last_number_decimal_comma():
+    from benchsmith.scoring import score_numeric
+
+    class Echo:
+        def __init__(self, text): self.text = text
+        def generate(self, prompt, max_tokens, temperature, n): return [self.text] * n
+
+    it = Item(id="x", kind=Kind.NUMERIC, prompt="p", target="68.6", tolerance=0.05)
+    both = Task(name="t", file="f", kind=Kind.NUMERIC,
+                scoring={"answer_prefix": ["RISPOSTA:", "ANSWER:"], "decimal_comma": True})
+    assert score_numeric(it, both, Echo("calcolo 12,3 ...\nRISPOSTA: 68,6"))[0] == 1.0   # Italian marker + comma
+    assert score_numeric(it, both, Echo("working 12.3\nANSWER: 68.6"))[0] == 1.0        # English marker accepted too
+    assert score_numeric(it, both, Echo("ANSWER: 1\nRISPOSTA: 68.6"))[0] == 1.0         # the LAST marker of either wins
+    assert score_numeric(it, both, Echo("1,234 patients; RISPOSTA: 68.6"))[0] == 1.0    # a thousands group is untouched
+    last = Task(name="t", file="f", kind=Kind.NUMERIC, scoring={"number": "last"})
+    it2 = Item(id="y", kind=Kind.NUMERIC, prompt="p", target="41.6", tolerance=0.001)
+    assert score_numeric(it2, last, Echo("In Study 2, the rate was 41.6%"))[0] == 1.0    # echo no longer read as the answer
+    assert score_numeric(it2, last, Echo('3{ "text": "41.6" }'))[0] == 1.0
+    assert score_numeric(it2, Task(name="t", file="f", kind=Kind.NUMERIC), Echo("In Study 2, 41.6"))[0] == 0.0
+    with pytest.raises(ValueError):
+        score_numeric(it2, Task(name="t", file="f", kind=Kind.NUMERIC, scoring={"number": "middle"}), Echo("1"))
+
+
+def test_suite_local_checker(tmp_path):
+    root = tmp_path / "s"
+    root.mkdir()
+    (root / "checker.py").write_text(
+        "def score(item, output):\n    return {'score': float('ok' in output), 'tiers': {'t1': 1.0}}\n")
+    meta = SuiteMeta(name="s", version="1.0", tasks=[Task(name="t", file="t.jsonl", kind=Kind.PROGRAM)])
+    items = {"t": [Item(id="p", kind=Kind.PROGRAM, prompt="q", checker="./checker.py:score")]}
+    s = save_suite(root, meta, items)
+
+    class Echo:
+        supports_logprobs, supports_generate = False, True
+        def generate(self, prompt, max_tokens, temperature, n):
+            return ["ok"] * n
+
+    score, detail, _ = score_item(items["t"][0], s.tasks[0], Echo(), root=s.root)
+    assert score == 1.0 and detail["judge"]["tiers"] == {"t1": 1.0}
+    # module-style specs still resolve; a missing checker file is a clear error
+    assert load_checker("benchsmith.scoring:first_number")("3 m") == 3
+    with pytest.raises(FileNotFoundError):
+        load_checker("./nope.py:score", root)
+    # the checker file is part of the content hash: editing it moves the benchmark
+    h = s.content_hash()
+    (root / "checker.py").write_text("def score(item, output):\n    return 1.0\n")
+    assert load_suite(root).content_hash() != h
+
+
+def test_checker_preflight_runs_before_any_model_call(tmp_path):
+    root = tmp_path / "s"
+    root.mkdir()
+    (root / "checker.py").write_text(
+        "def score(item, output):\n    return 1.0\n"
+        "def _probe():\n    raise RuntimeError('pandas missing')\n"
+        "score.preflight = _probe\n")
+    meta = SuiteMeta(name="s", version="1.0", tasks=[Task(name="t", file="t.jsonl", kind=Kind.PROGRAM)])
+    items = {"t": [Item(id="p", kind=Kind.PROGRAM, prompt="q", checker="./checker.py:score")]}
+    s = save_suite(root, meta, items)
+
+    class Counting:
+        supports_logprobs, supports_generate = False, True
+        info, stats, calls = BackendInfo(backend="dummy", model="x"), Stats(), 0
+
+        def generate(self, prompt, max_tokens, temperature, n):
+            self.calls += 1
+            return ["x"] * n
+
+    be = Counting()
+    with pytest.raises(RuntimeError, match="pandas missing"):
+        run_suite(s, be)
+    assert be.calls == 0  # the environment gap surfaced before any model call
+
+
 def test_stats():
     assert mcnemar_exact_p(0, 0) == 1.0
     assert mcnemar_exact_p(10, 0) < 0.01
     lo, hi = wilson(0.5, 800)
     assert 0.46 < lo < 0.47 and 0.53 < hi < 0.54
+
+
+def test_parallel_workers_match_sequential(tmp_path):
+    s = make_suite(tmp_path)
+    r1 = run_suite(s, DummyBackend("uniform"))
+    r4 = run_suite(s, DummyBackend("uniform"), workers=4)
+    assert [(r.item_id, r.score) for r in r1.results] == [(r.item_id, r.score) for r in r4.results]
+    assert r4.stats["prompt_tokens"] == r1.stats["prompt_tokens"]
+    # a backend that opts out stays sequential (still one result per item, in order)
+    be = DummyBackend("uniform")
+    be.parallel_safe = False
+    r = run_suite(s, be, workers=4)
+    assert [x.item_id for x in r.results] == [x.item_id for x in r1.results]
 
 
 def test_generative_fallback_for_backend_without_logprobs(tmp_path):

@@ -21,6 +21,7 @@ import argparse
 import importlib.util
 import json
 import random
+import shutil
 import subprocess
 import sys
 import types
@@ -33,7 +34,10 @@ SEED = 1000
 N_PER_FORMAT = 300
 N_REF = 50_000
 REF_INDEX_OFFSET = 100_000   # reference docs use indices [100000, 150000) — disjoint from prompts [0, 900)
-CHECKER = "benchsmith.checks.schedules:score"
+CHECKER = "./checker.py:score"
+# canonical checker source, copied into the authored suite dir (suite-local, hash-covered);
+# point this at the newest frozen suite when bumping versions
+CHECKER_SRC = Path(__file__).resolve().parents[1] / "suites/schedules_v1.1/checker.py"
 
 
 def load_generator(path: Path):
@@ -166,9 +170,11 @@ def main():
         tasks=tasks,
         meta={"generator": str(gpath), "generator_commit": commit, "generator_seed": SEED, "training_seed": 42,
               "prompt_index_range": [0, 3 * N_PER_FORMAT], "reference_stats": "reference_stats.json",
+              "calibration": "./checker.py:calibrate",
               "cut_point": "after the persona block, before the first day"},
     )
     save_suite(out, meta, {t.name: items[t.name.split("_")[1]] for t in tasks})
+    shutil.copy(CHECKER_SRC, out / "checker.py")
     for t in tasks:
         print(f"{t.name:14s} {len(items[t.name.split('_')[1]])} prompts")
     print("building reference stats from", N_REF, "held-out docs …")

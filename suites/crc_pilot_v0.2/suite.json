@@ -1,0 +1,178 @@
+{
+  "name": "crc_pilot",
+  "version": "0.2",
+  "description": "SLM capability ladder for colorectal-cancer drug-efficacy work: knowledge -> extraction -> computation -> structured summarization -> tool calls, each in EN and IT. Built to compare model families and quantizations of the same family per tier.",
+  "tasks": [
+    {
+      "name": "mcq_en",
+      "file": "mcq_en.jsonl",
+      "kind": "choice_generate",
+      "description": "tier 1 EN: CRC drug/biomarker knowledge (hand-written, expert review pending)",
+      "scoring": {}
+    },
+    {
+      "name": "mcq_it",
+      "file": "mcq_it.jsonl",
+      "kind": "choice_generate",
+      "description": "tier 1 IT: parallel translations of mcq_en (pair: tags)",
+      "scoring": {}
+    },
+    {
+      "name": "extract_en",
+      "file": "extract_en.jsonl",
+      "kind": "numeric",
+      "description": "tier 2 EN: extract one number from a synthetic trial abstract",
+      "scoring": {
+        "min_rel_tol": 0.0
+      }
+    },
+    {
+      "name": "extract_it",
+      "file": "extract_it.jsonl",
+      "kind": "numeric",
+      "description": "tier 2 IT: parallel abstracts (decimal point enforced in prompt)",
+      "scoring": {}
+    },
+    {
+      "name": "compute_en",
+      "file": "compute_en.jsonl",
+      "kind": "numeric",
+      "description": "tier 3 EN: derive risk difference / NNT / pooled ORR",
+      "scoring": {
+        "answer_prefix": "ANSWER:"
+      }
+    },
+    {
+      "name": "compute_it",
+      "file": "compute_it.jsonl",
+      "kind": "numeric",
+      "description": "tier 3 IT: parallel",
+      "scoring": {
+        "answer_prefix": "RISPOSTA:"
+      }
+    },
+    {
+      "name": "summary_en",
+      "file": "summary_en.jsonl",
+      "kind": "program",
+      "description": "tier 4 EN: abstract -> fixed-schema JSON, scored by ./checker.py:score_summary",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "summary_it",
+      "file": "summary_it.jsonl",
+      "kind": "program",
+      "description": "tier 4 IT: parallel (JSON keys stay English)",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "tool_en",
+      "file": "tool_en.jsonl",
+      "kind": "program",
+      "description": "tier 5 EN: emit an execute_python tool call, scored by ./checker.py:score_tool_call",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "tool_it",
+      "file": "tool_it.jsonl",
+      "kind": "program",
+      "description": "tier 5 IT: parallel",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "mcq_hard_en",
+      "file": "mcq_hard_en.jsonl",
+      "kind": "choice_generate",
+      "description": "hard tier 1 EN: trial attribution, metabolites, fine pharmacology (expert review pending)",
+      "scoring": {}
+    },
+    {
+      "name": "mcq_hard_it",
+      "file": "mcq_hard_it.jsonl",
+      "kind": "choice_generate",
+      "description": "hard tier 1 IT: parallel",
+      "scoring": {}
+    },
+    {
+      "name": "extract_hard_en",
+      "file": "extract_hard_en.jsonl",
+      "kind": "numeric",
+      "description": "hard tier 2 EN: two studies + subgroup rows; disambiguate study, arm and subgroup",
+      "scoring": {}
+    },
+    {
+      "name": "extract_hard_it",
+      "file": "extract_hard_it.jsonl",
+      "kind": "numeric",
+      "description": "hard tier 2 IT: parallel",
+      "scoring": {}
+    },
+    {
+      "name": "summary_hard_en",
+      "file": "summary_hard_en.jsonl",
+      "kind": "program",
+      "description": "hard tier 4 EN: schema adds derived field orr_absolute_difference_pct",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "summary_hard_it",
+      "file": "summary_hard_it.jsonl",
+      "kind": "program",
+      "description": "hard tier 4 IT: parallel",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "tool_hard_en",
+      "file": "tool_hard_en.jsonl",
+      "kind": "program",
+      "description": "hard tier 5 EN: emitted code is EXECUTED against the table; printed result must match",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "tool_hard_it",
+      "file": "tool_hard_it.jsonl",
+      "kind": "program",
+      "description": "hard tier 5 IT: parallel",
+      "scoring": {
+        "temperature": 0.0
+      }
+    }
+  ],
+  "meta": {
+    "domain": "colorectal cancer drug efficacy",
+    "languages": [
+      "en",
+      "it"
+    ],
+    "seed": 7000,
+    "review_status": "DRAFT v0.2 — tier-1 facts (base + hard) and IT phrasing pending domain-expert review",
+    "tiers": {
+      "1": "mcq",
+      "2": "extract",
+      "3": "compute",
+      "4": "summary",
+      "5": "tool"
+    },
+    "hard_band": [
+      "mcq_hard",
+      "extract_hard",
+      "summary_hard",
+      "tool_hard"
+    ],
+    "exec_warning": "tool_hard_* checkers execute model-generated Python in a subprocess (10s timeout)"
+  }
+}

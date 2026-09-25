@@ -1,0 +1,63 @@
+{
+  "name": "dialogue",
+  "version": "1.1",
+  "description": "Track 3 — everyday dialogue coherence (out-of-distribution: no dialogue source in training).",
+  "tasks": [
+    {
+      "name": "pairs_factual",
+      "file": "pairs_factual.jsonl",
+      "kind": "pair_loglik",
+      "description": "factual violation: length-normalised logprob(good) > logprob(bad)",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "pairs_pragmatic",
+      "file": "pairs_pragmatic.jsonl",
+      "kind": "pair_loglik",
+      "description": "pragmatic violation: length-normalised logprob(good) > logprob(bad)",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "pairs_social",
+      "file": "pairs_social.jsonl",
+      "kind": "pair_loglik",
+      "description": "social violation: length-normalised logprob(good) > logprob(bad)",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "pairs_temporal",
+      "file": "pairs_temporal.jsonl",
+      "kind": "pair_loglik",
+      "description": "temporal violation: length-normalised logprob(good) > logprob(bad)",
+      "scoring": {
+        "normalize": "mean"
+      }
+    },
+    {
+      "name": "openers",
+      "file": "prompts.jsonl",
+      "kind": "program",
+      "description": "QUALITATIVE: lenient format/alternation/on-topic check of a generated reply",
+      "scoring": {
+        "temperature": 0.0
+      }
+    }
+  ],
+  "meta": {
+    "violation_types": [
+      "factual",
+      "pragmatic",
+      "social",
+      "temporal"
+    ],
+    "qualitative_tasks": [
+      "openers"
+    ]
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "suite": "crc_pilot",
+  "version": "0.1",
+  "content_hash": "27d597d15d89a73e",
+  "frozen_at": "2026-09-01T13:36:36+00:00",
+  "git_commit": "e93420cc5e8752d0a578a2141e30ee8442dfd76f",
+  "n_items": 336,
+  "meta": {
+    "domain": "colorectal cancer drug efficacy",
+    "languages": [
+      "en",
+      "it"
+    ],
+    "seed": 7000,
+    "review_status": "DRAFT v0.1 \u2014 tier-1 facts and IT phrasing pending domain-expert review",
+    "tiers": {
+      "1": "mcq",
+      "2": "extract",
+      "3": "compute",
+      "4": "summary",
+      "5": "tool"
+    }
+  },
+  "files": {
+    "mcq_en.jsonl": {
+      "task": "mcq_en",
+      "kind": "choice_generate",
+      "n_items": 24,
+      "provenance": {
+        "hand:scripts/author_crc_pilot.py": 24
+      },
+      "seeds": [],
+      "categories": {
+        "en": 24
+      }
+    },
+    "mcq_it.jsonl": {
+      "task": "mcq_it",
+      "kind": "choice_generate",
+      "n_items": 24,
+      "provenance": {
+        "hand:scripts/author_crc_pilot.py": 24
+      },
+      "seeds": [],
+      "categories": {
+        "it": 24
+      }
+    },
+    "extract_en.jsonl": {
+      "task": "extract_en",
+      "kind": "numeric",
+      "n_items": 60,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 60
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "orr_e": 10,
+        "orr_c": 10,
+        "pfs_e": 10,
+        "hr": 10,
+        "os_c": 10,
+        "ae_e": 10
+      }
+    },
+    "extract_it.jsonl": {
+      "task": "extract_it",
+      "kind": "numeric",
+      "n_items": 60,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 60
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "orr_e": 10,
+        "orr_c": 10,
+        "pfs_e": 10,
+        "hr": 10,
+        "os_c": 10,
+        "ae_e": 10
+      }
+    },
+    "compute_en.jsonl": {
+      "task": "compute_en",
+      "kind": "numeric",
+      "n_items": 24,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 24
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "arr": 8,
+        "nnt": 8,
+        "pooled": 8
+      }
+    },
+    "compute_it.jsonl": {
+      "task": "compute_it",
+      "kind": "numeric",
+      "n_items": 24,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 24
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "arr": 8,
+        "nnt": 8,
+        "pooled": 8
+      }
+    },
+    "summary_en.jsonl": {
+      "task": "summary_en",
+      "kind": "program",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 40
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "en": 40
+      }
+    },
+    "summary_it.jsonl": {
+      "task": "summary_it",
+      "kind": "program",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 40
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "it": 40
+      }
+    },
+    "tool_en.jsonl": {
+      "task": "tool_en",
+      "kind": "program",
+      "n_items": 20,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 20
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "en": 20
+      }
+    },
+    "tool_it.jsonl": {
+      "task": "tool_it",
+      "kind": "program",
+      "n_items": 20,
+      "provenance": {
+        "template:scripts/author_crc_pilot.py": 20
+      },
+      "seeds": [
+        7000
+      ],
+      "categories": {
+        "it": 20
+      }
+    }
+  }
+}

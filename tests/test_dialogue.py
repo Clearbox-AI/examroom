@@ -2,19 +2,24 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.checks.dialogue import score
 from benchsmith.items import Item, Kind, load_suite
+from benchsmith.scoring import checker_module
 from benchsmith.validate import validate_suite
 
-SUITE = Path(__file__).resolve().parents[1] / "suites" / "dialogue_v1"
+SUITE = Path(__file__).resolve().parents[1] / "suites" / "dialogue_v1.1"
 pytestmark = pytest.mark.skipif(not SUITE.exists(), reason="dialogue suite not authored")
 
 
+@pytest.fixture(scope="module")
+def score():
+    return checker_module("./checker.py", SUITE).score
+
+
 def opener(text="Good morning, did you sleep well?"):
-    return Item(id="o", kind=Kind.PROGRAM, prompt=f"A: {text}\nB:", checker="benchsmith.checks.dialogue:score")
+    return Item(id="o", kind=Kind.PROGRAM, prompt=f"A: {text}\nB:", checker="./checker.py:score")
 
 
-def test_dialogue_checker_signals():
+def test_dialogue_checker_signals(score):
     good = score(opener(), " Yes, I slept very well, thanks.\nA: Great, breakfast is ready.\nB: Coming!")
     assert good["score"] == 1.0
     assert score(opener(), "")["score"] == 0.0

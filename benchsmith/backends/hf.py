@@ -12,6 +12,7 @@ from benchsmith.backends.base import BackendInfo, Stats, Timer
 class HFBackend:
     supports_logprobs = True
     supports_generate = True
+    parallel_safe = False  # single local model: threads would contend for the GPU/CPU
 
     def __init__(
         self,

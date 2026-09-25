@@ -118,7 +118,8 @@ def cmd_run(a):
         if a.verbose or i % 100 == 0 or i == n:
             print(f"\r[{i}/{n}] {r.task} {r.item_id} {r.score:.0f}", end="", file=sys.stderr)
 
-    run = run_suite(suite, backend, tasks=a.task, limit=a.limit, label=a.label, progress=progress, overrides=overrides)
+    run = run_suite(suite, backend, tasks=a.task, limit=a.limit, label=a.label, progress=progress,
+                    overrides=overrides, workers=a.workers)
     backend.close()
     print(file=sys.stderr)
     if not a.dry_run:
@@ -186,12 +187,18 @@ def cmd_diff(a):
 
 def cmd_calibrate(a):
     """T4: KL between a run's sampled completions and the suite's reference_stats.json."""
-    from benchsmith.checks.calibration import calibrate
     from benchsmith.ledger import Ledger
+    from benchsmith.scoring import load_checker
 
     led = Ledger(a.ledger)
     row = led.run(a.run_id)
     suite = load_suite(a.suite)
+    spec = suite.meta.meta.get("calibration", "./checker.py:calibrate")
+    try:
+        calibrate = load_checker(spec, suite.root)
+    except (FileNotFoundError, ModuleNotFoundError, AttributeError) as e:
+        print(f"suite has no calibration entry point ({spec}): {e}")
+        return 1
     if suite.content_hash() != row["suite_hash"]:
         print("WARNING: suite content hash differs from the run's")
     ref_path = suite.root / suite.meta.meta.get("reference_stats", "reference_stats.json")
@@ -278,6 +285,8 @@ def main(argv=None):
     p.add_argument("--instruction", help="append an instruction to every generative prompt "
                    "(chat models: e.g. 'Answer with only the number.'); recorded in run metadata")
     p.add_argument("--label"); p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("--workers", type=int, default=1,
+                   help="score items concurrently (API backends; hf runs stay sequential)")
     p.add_argument("--dry-run", action="store_true"); p.add_argument("--allow-unfrozen", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_run)
 

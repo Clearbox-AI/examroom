@@ -12,7 +12,8 @@ dependencies = [
 hf = ["torch", "transformers", "accelerate"]
 anthropic = ["anthropic>=1"]
 openai = ["openai"]
-dev = ["pytest"]
+crc = ["pandas"]                  # suites/crc_pilot: tool_hard checkers execute pandas code in a subprocess
+dev = ["pytest", "pandas"]
 
 [project.scripts]
 benchsmith = "benchsmith.cli:main"

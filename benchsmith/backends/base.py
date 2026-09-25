@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import resource
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
@@ -33,12 +34,16 @@ class Stats:
     forward_calls: int = 0
     peak_rss_mb: float | None = None
     peak_device_mem_mb: float | None = None
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def tick(self, seconds: float, prompt_tokens: int = 0, generated_tokens: int = 0) -> None:
-        self.wall_seconds += seconds
-        self.prompt_tokens += prompt_tokens
-        self.generated_tokens += generated_tokens
-        self.forward_calls += 1
+        # with parallel workers, wall_seconds is summed API time (not elapsed wall clock),
+        # so tokens_per_second stays a per-request rate
+        with self._lock:
+            self.wall_seconds += seconds
+            self.prompt_tokens += prompt_tokens
+            self.generated_tokens += generated_tokens
+            self.forward_calls += 1
 
     def finalize(self) -> dict:
         self.peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024

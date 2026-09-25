@@ -1,0 +1,67 @@
+{
+  "suite": "schedules",
+  "version": "1.1",
+  "content_hash": "d4878534eafe2ea4",
+  "frozen_at": "2026-09-01T13:09:33+00:00",
+  "git_commit": "e93420cc5e8752d0a578a2141e30ee8442dfd76f",
+  "n_items": 900,
+  "meta": {
+    "generator": "/home/gillus/tiny_corpus_prep/bin/generate_structured.py",
+    "generator_commit": "3f9d389",
+    "generator_seed": 1000,
+    "training_seed": 42,
+    "prompt_index_range": [
+      0,
+      900
+    ],
+    "reference_stats": "reference_stats.json",
+    "calibration": "./checker.py:calibrate",
+    "cut_point": "after the persona block, before the first day",
+    "leakage_check": "exact",
+    "leakage_note": "format boilerplate shares 13-grams with any generator output by design; leakage means an identical document or prompt prefix (seed disjointness)"
+  },
+  "files": {
+    "prompts_xml.jsonl": {
+      "task": "schedule_xml",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "xml": 300
+      }
+    },
+    "prompts_json.jsonl": {
+      "task": "schedule_json",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "json": 300
+      }
+    },
+    "prompts_kv.jsonl": {
+      "task": "schedule_kv",
+      "kind": "program",
+      "n_items": 300,
+      "provenance": {
+        "generator:generate_structured.py@3f9d389": 300
+      },
+      "seeds": [
+        1000
+      ],
+      "categories": {
+        "kv": 300
+      }
+    }
+  }
+}

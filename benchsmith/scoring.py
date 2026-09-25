@@ -2,16 +2,57 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
+import importlib.util
 import math
 import re
 import string
+import sys
+from pathlib import Path
 from typing import Any
 
 from benchsmith.backends.base import Backend
 from benchsmith.items import Item, Kind, Task
 
 LETTERS = "ABCDEFGH"
+
+
+# --- checkers -----------------------------------------------------------------
+_MODULE_CACHE: dict[str, Any] = {}
+
+
+def checker_module(mod: str, root: Path | None = None):
+    """Resolve the module half of a checker spec.
+
+    Two forms:
+      "package.module"   importable module (a checker shipped as installed code)
+      "<path>.py"        file relative to the suite directory — the normal case,
+                         so a frozen suite carries its own scoring code
+    """
+    if not mod.endswith(".py"):
+        return importlib.import_module(mod)
+    path = (Path(root) / mod if root is not None else Path(mod)).resolve()
+    key = str(path)
+    if key not in _MODULE_CACHE:
+        if not path.is_file():
+            raise FileNotFoundError(f"checker file {mod!r} not found under {root}")
+        name = f"benchsmith_checker_{hashlib.sha1(key.encode()).hexdigest()[:12]}"
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        _MODULE_CACHE[key] = module
+    return _MODULE_CACHE[key]
+
+
+def load_checker(spec: str, root: Path | None = None):
+    """Resolve "module:function". A checker function may carry a `preflight`
+    attribute (a zero-argument callable); the runner calls it once per run before
+    the first model call, so a checker that needs an external tool or library can
+    fail loudly up front instead of scoring an environment failure as a model failure."""
+    mod, fn = spec.split(":")
+    return getattr(checker_module(mod, root), fn)
 
 
 # --- likelihood ---------------------------------------------------------------
@@ -105,26 +146,39 @@ def score_regex(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
 _SUP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")
 _NUM = re.compile(
     r"(?P<ten_s>[-+]?)10\s*(?:\^|\*\*)\s*\{?(?P<ten_e>[-+]?\d+)\}?"          # bare 10^n
-    r"|(?P<mant>[-+]?\d[\d,]*(?:\.\d+)?)"
+    r"|(?P<mant>[-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+))"                        # 1,234.5 or .69
     r"(?:\s*(?:[×*·]|\\times|[xX])\s*10\s*(?:\^|\*\*)\s*\{?(?P<pexp>[-+]?\d+)\}?"  # a × 10^n
     r"|[eE](?P<eexp>[-+]?\d+))?"                                             # a e n
 )
 
 
-def first_number(text: str) -> float | None:
+_DECIMAL_COMMA = re.compile(r"(\d),(\d{1,2})(?!\d)")  # 68,6 -> 68.6 ; 1,234 stays a thousands group
+
+
+def _prep(text: str) -> str:
     text = text.replace("−", "-")
-    text = re.sub(  # 10⁴ -> 10^4 so scientific notation survives
+    return re.sub(  # 10⁴ -> 10^4 so scientific notation survives
         r"10\s*([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)", lambda m: "10^" + m.group(1).translate(_SUP), text
     )
-    m = _NUM.search(text)
-    if not m:
-        return None
+
+
+def _value(m: re.Match) -> float:
     if m.group("ten_e") is not None:
         v = 10.0 ** int(m.group("ten_e"))
         return -v if m.group("ten_s") == "-" else v
     v = float(m.group("mant").replace(",", ""))
     exp = m.group("pexp") or m.group("eexp")
     return v * 10.0 ** int(exp) if exp else v
+
+
+def first_number(text: str) -> float | None:
+    m = _NUM.search(_prep(text))
+    return _value(m) if m else None
+
+
+def last_number(text: str) -> float | None:
+    ms = list(_NUM.finditer(_prep(text)))
+    return _value(ms[-1]) if ms else None
 
 
 def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
@@ -136,11 +190,32 @@ def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict
     #   min_rel_tol: tolerance floor as a fraction of |target|, so an answer correctly
     #   rounded to fewer digits than the reference still passes
     use_abs = task.scoring.get("abs", False)
+    # answer_prefix: parse the number AFTER the last occurrence of this marker (a
+    # string, or a list of accepted markers such as ["RISPOSTA:", "ANSWER:"]), so
+    # chatty models can show working; outputs without any marker fall back to the
+    # whole output, so terse models still pass
+    prefixes = task.scoring.get("answer_prefix") or []
+    prefixes = [prefixes] if isinstance(prefixes, str) else list(prefixes)
+    # number: which number of the (remaining) text is the answer — "first" (default)
+    # or "last"; "last" suits "answer with only the number" prompts, where a preamble
+    # echoing the question ("In Study 2, ...") would otherwise be read as the answer
+    which = task.scoring.get("number", "first")
+    if which not in ("first", "last"):
+        raise ValueError(f"scoring.number must be 'first' or 'last', got {which!r}")
+    # decimal_comma: read "68,6" as 68.6 (Italian locale) instead of 686
+    decimal_comma = task.scoring.get("decimal_comma", False)
     eff_tol = tol * abs(target) if rel else tol
     eff_tol = max(eff_tol, task.scoring.get("min_rel_tol", 0.0) * abs(target))
 
     def judge(o: str) -> float:
-        x = first_number(o)
+        text = o
+        hits = [(o.lower().rfind(p.lower()), len(p)) for p in prefixes]
+        if any(i >= 0 for i, _ in hits):
+            i, n = max(h for h in hits if h[0] >= 0)
+            text = o[i + n:]
+        if decimal_comma:
+            text = _DECIMAL_COMMA.sub(r"\1.\2", text)
+        x = (last_number if which == "last" else first_number)(text)
         if x is None or math.isnan(x):
             return 0.0
         err = abs(abs(x) - abs(target)) if use_abs else abs(x - target)
@@ -149,9 +224,8 @@ def score_numeric(item: Item, task: Task, backend: Backend) -> tuple[float, dict
     return _sampled(item, task, backend, item.prompt, judge)
 
 
-def score_program(item: Item, task: Task, backend: Backend) -> tuple[float, dict]:
-    mod, fn = item.checker.split(":")
-    checker = getattr(importlib.import_module(mod), fn)
+def score_program(item: Item, task: Task, backend: Backend, root: Path | None = None) -> tuple[float, dict]:
+    checker = load_checker(item.checker, root)
     return _sampled(item, task, backend, item.prompt, lambda o: checker(item, o))
 
 
@@ -178,7 +252,11 @@ def resolve_protocol(kind: Kind, backend: Backend) -> Kind:
     return kind
 
 
-def score_item(item: Item, task: Task, backend: Backend) -> tuple[float, dict[str, Any], Kind]:
+def score_item(item: Item, task: Task, backend: Backend, root: Path | None = None) -> tuple[float, dict[str, Any], Kind]:
+    """`root` is the suite directory, used to resolve suite-local checker files."""
     protocol = resolve_protocol(item.kind, backend)
-    score, detail = SCORERS[protocol](item, task, backend)
+    if protocol == Kind.PROGRAM:
+        score, detail = score_program(item, task, backend, root)
+    else:
+        score, detail = SCORERS[protocol](item, task, backend)
     return score, detail, protocol

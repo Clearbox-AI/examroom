@@ -1,0 +1,49 @@
+{
+  "name": "schedules",
+  "version": "1.1",
+  "description": "Track 2 \u2014 schedule coherence: structure emission on the model's home format, scored programmatically (T1 parse, T2 schema, T3 generator rules) plus T4 calibration against reference_stats.json.",
+  "tasks": [
+    {
+      "name": "schedule_xml",
+      "file": "prompts_xml.jsonl",
+      "kind": "program",
+      "description": "Complete a household week in XML from the persona prefix; scored T1\u2013T3 by ./checker.py:score",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "schedule_json",
+      "file": "prompts_json.jsonl",
+      "kind": "program",
+      "description": "Complete a household week in JSON from the persona prefix; scored T1\u2013T3 by ./checker.py:score",
+      "scoring": {
+        "temperature": 0.0
+      }
+    },
+    {
+      "name": "schedule_kv",
+      "file": "prompts_kv.jsonl",
+      "kind": "program",
+      "description": "Complete a household week in KV from the persona prefix; scored T1\u2013T3 by ./checker.py:score",
+      "scoring": {
+        "temperature": 0.0
+      }
+    }
+  ],
+  "meta": {
+    "generator": "/home/gillus/tiny_corpus_prep/bin/generate_structured.py",
+    "generator_commit": "3f9d389",
+    "generator_seed": 1000,
+    "training_seed": 42,
+    "prompt_index_range": [
+      0,
+      900
+    ],
+    "reference_stats": "reference_stats.json",
+    "calibration": "./checker.py:calibrate",
+    "cut_point": "after the persona block, before the first day",
+    "leakage_check": "exact",
+    "leakage_note": "format boilerplate shares 13-grams with any generator output by design; leakage means an identical document or prompt prefix (seed disjointness)"
+  }
+}

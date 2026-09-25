@@ -15,7 +15,7 @@ out-of-distribution generalisation; expect low absolute scores at 50M.
                 the patient to open their textbook…)
      temporal:  impossible sequence (breakfast after dinner, Tuesday after Sunday…)
 2. `prompts.jsonl` (program, ~100): openers "A: …\nB:" scored leniently by
-   benchsmith.checks.dialogue:score — format, alternation, on-topic. Qualitative.
+   ./checker.py:score (suite-local) — format, alternation, on-topic. Qualitative.
 
 Conventions: context ends with "B:" (no trailing space); continuations begin
 with a single space; both continuations are one sentence.
@@ -24,7 +24,9 @@ with a single space; both continuations are one sentence.
 from __future__ import annotations
 
 import argparse
+import shutil
 from collections import Counter
+from pathlib import Path
 
 from benchsmith.authoring.templates import PairBuilder
 from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
@@ -446,7 +448,7 @@ def main():
     for k, v in sorted(by_type.items()):
         print(f"pairs/{k:10s} {len(v)}")
 
-    prompts = [Item(id=f"dlg-open-{i:03d}", kind=Kind.PROGRAM, prompt=ctx(a), checker="benchsmith.checks.dialogue:score",
+    prompts = [Item(id=f"dlg-open-{i:03d}", kind=Kind.PROGRAM, prompt=ctx(a), checker="./checker.py:score",
                     category="opener", max_tokens=48, provenance=Provenance(method="hand", source="OPENERS", author=AUTHOR))
                for i, a in enumerate(OPENERS)]
     print(f"prompts           {len(prompts)}")
@@ -461,6 +463,8 @@ def main():
                      description="Track 3 — everyday dialogue coherence (out-of-distribution: no dialogue source in training).",
                      tasks=tasks, meta={"violation_types": sorted(by_type), "qualitative_tasks": ["openers"]})
     save_suite(args.out, meta, items)
+    # suite-local checker, copied from the newest frozen suite (hash-covered)
+    shutil.copy(Path(__file__).resolve().parents[1] / "suites/dialogue_v1.1/checker.py", Path(args.out) / "checker.py")
     print("total", len(pairs) + len(prompts), "->", args.out)
 
 

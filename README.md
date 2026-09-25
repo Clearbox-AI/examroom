@@ -54,16 +54,16 @@ and `pair_loglik` refuses to run.
 * `suites/world_model_v1/` — Track 1 of the tiny-model capability brief: 1223
   closed-set cloze probes in 5 sub-categories, scored by per-token-mean
   log-likelihood. See its README for the scoring spec.
-* `suites/schedules_v1/` — Track 2: 900 household-week prompts (300 × XML/JSON/KV)
+* `suites/schedules_v1.1/` — Track 2: 900 household-week prompts (300 × XML/JSON/KV)
   sliced from held-out generator documents (seed 1000), scored programmatically
-  by `benchsmith/checks/schedules.py` (T1 parse, T2 schema, T3 the generator's
+  by the suite-local `checker.py` (T1 parse, T2 schema, T3 the generator's
   rules, each cited to a line of `generate_structured.py`), plus
   `benchsmith calibrate` for T4 (KL vs `reference_stats.json`, 50k held-out docs).
   Re-author with `scripts/author_schedules.py --generator <path>`; the generator
   is only needed at authoring time.
-* `suites/dialogue_v1/` — Track 3: 491 `pair_loglik` minimal pairs (pragmatic /
+* `suites/dialogue_v1.1/` — Track 3: 491 `pair_loglik` minimal pairs (pragmatic /
   factual / social / temporal violations, length- and vocabulary-matched) plus
-  101 generative openers scored leniently by `benchsmith/checks/dialogue.py`
+  101 generative openers scored leniently by the suite-local `checker.py`
   (qualitative). Out-of-distribution by design — read as a trend across the ladder.
 
 ## Writing your own

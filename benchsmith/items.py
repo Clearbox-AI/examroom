@@ -150,13 +150,28 @@ class Suite:
         return sum(len(v) for v in self.items.values())
 
     def content_hash(self) -> str:
-        """Stable hash of every item (sorted by id) + task config. Changes if the benchmark moves."""
+        """Stable hash of every item (sorted by id) + task config + suite-local checker code.
+
+        Checker files referenced as "<path>.py:function" (by items, or by
+        meta["calibration"]) are part of what the benchmark measures, so their
+        bytes are hashed too: editing a frozen suite's checker changes the hash.
+        """
         h = hashlib.sha256()
+        specs: set[str] = set()
         for t in sorted(self.meta.tasks, key=lambda t: t.name):
             h.update(t.model_dump_json().encode())
             for it in sorted(self.items[t.name], key=lambda i: i.id):
+                if it.checker:
+                    specs.add(it.checker)
                 h.update(it.canonical().encode())
                 h.update(b"\n")
+        if isinstance(self.meta.meta.get("calibration"), str):
+            specs.add(self.meta.meta["calibration"])
+        for spec in sorted(specs):
+            mod = spec.split(":")[0]
+            if mod.endswith(".py") and self.root is not None and (Path(self.root) / mod).is_file():
+                h.update(f"checker:{mod}\n".encode())
+                h.update((Path(self.root) / mod).read_bytes())
         return h.hexdigest()[:16]
 
 
