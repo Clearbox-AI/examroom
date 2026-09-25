@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from benchsmith.ledger import Ledger
+from examroom.ledger import Ledger
 
 
 def wilson(p: float, n: int, z: float = 1.96) -> tuple[float, float]:

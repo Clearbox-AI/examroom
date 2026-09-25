@@ -3,15 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.authoring.templates import Builder
-from benchsmith.backends.base import BackendInfo, Stats
-from benchsmith.backends.dummy import DummyBackend
-from benchsmith.diff import diff_runs, mcnemar_exact_p, wilson
-from benchsmith.items import Item, Kind, SuiteMeta, Task, load_suite, save_suite
-from benchsmith.ledger import Ledger
-from benchsmith.runner import run_suite
-from benchsmith.scoring import first_number, last_number, load_checker, parse_letter, score_item
-from benchsmith.validate import prior_accuracy, validate_suite
+from examroom.authoring.templates import Builder
+from examroom.backends.base import BackendInfo, Stats
+from examroom.backends.dummy import DummyBackend
+from examroom.diff import diff_runs, mcnemar_exact_p, wilson
+from examroom.items import Item, Kind, SuiteMeta, Task, load_suite, save_suite
+from examroom.ledger import Ledger
+from examroom.runner import run_suite
+from examroom.scoring import first_number, last_number, load_checker, parse_letter, score_item
+from examroom.validate import prior_accuracy, validate_suite
 
 
 def make_suite(tmp_path: Path, n=12):
@@ -132,7 +132,7 @@ def test_length_normalisation_matters():
 
 
 def test_numeric_answer_prefix():
-    from benchsmith.scoring import score_numeric
+    from examroom.scoring import score_numeric
 
     class Echo:
         def __init__(self, text): self.text = text
@@ -147,7 +147,7 @@ def test_numeric_answer_prefix():
 
 
 def test_numeric_policies_prefix_list_last_number_decimal_comma():
-    from benchsmith.scoring import score_numeric
+    from examroom.scoring import score_numeric
 
     class Echo:
         def __init__(self, text): self.text = text
@@ -186,7 +186,7 @@ def test_suite_local_checker(tmp_path):
     score, detail, _ = score_item(items["t"][0], s.tasks[0], Echo(), root=s.root)
     assert score == 1.0 and detail["judge"]["tiers"] == {"t1": 1.0}
     # module-style specs still resolve; a missing checker file is a clear error
-    assert load_checker("benchsmith.scoring:first_number")("3 m") == 3
+    assert load_checker("examroom.scoring:first_number")("3 m") == 3
     with pytest.raises(FileNotFoundError):
         load_checker("./nope.py:score", root)
     # the checker file is part of the content hash: editing it moves the benchmark
@@ -250,9 +250,9 @@ def test_generative_fallback_for_backend_without_logprobs(tmp_path):
 
 def test_report_renders(tmp_path):
     import json
-    from benchsmith.ledger import Ledger
-    from benchsmith.report import render_report
-    from benchsmith.runner import ItemResult, RunResult
+    from examroom.ledger import Ledger
+    from examroom.report import render_report
+    from examroom.runner import ItemResult, RunResult
 
     led = Ledger(tmp_path / "l.sqlite")
     for rid, score in [("run-a", 1.0), ("run-b", 0.0)]:

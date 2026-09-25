@@ -2,7 +2,7 @@
 
 The generator (`bin/generate_structured.py` in the corpus repo) is loaded HERE, at
 authoring time only, from the path you pass; the resulting suite is frozen data
-and nothing under benchsmith/ or suites/ imports the training pipeline.
+and nothing under examroom/ or suites/ imports the training pipeline.
 
 For each format (xml, json, kv) it slices 300 held-out documents (seed 1000;
 training used seed 42 — `random.Random(f"{seed}:{index}")` makes the streams
@@ -28,7 +28,7 @@ import types
 from collections import Counter
 from pathlib import Path
 
-from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
+from examroom.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
 
 SEED = 1000
 N_PER_FORMAT = 300

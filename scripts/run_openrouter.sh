@@ -5,7 +5,7 @@
 #   scripts/run_openrouter.sh                      # full runs, recorded to the ledger
 #   scripts/run_openrouter.sh --limit 3 --dry-run  # cheap trial, nothing recorded
 #
-# Any extra arguments are passed through to `benchsmith run`.
+# Any extra arguments are passed through to `examroom run`.
 # NOTE: OpenRouter compares model FAMILIES at whatever precision each provider
 # serves (usually fp8/bf16). For the quantization ladder of one family (Q4 vs
 # Q5 vs FP16), serve GGUFs locally with llama.cpp and use the same openai:
@@ -36,12 +36,12 @@ for m in "${MODELS[@]}"; do
   esac
   echo "== $m  ($(date -u +%H:%M:%S))"
   # keep going if one model fails (bad id, upstream outage): the others still get recorded
-  uv run benchsmith run "$SUITE" "openai:$m" \
+  uv run examroom run "$SUITE" "openai:$m" \
     --opt base_url=https://openrouter.ai/api/v1 \
     --opt api_key_env=OPENROUTER_API_KEY \
     --workers 8 "${extra[@]}" --label "$label" "$@" || { echo "!! FAILED $m"; failed+=("$m"); }
 done
 
-uv run benchsmith report
+uv run examroom report
 if ((${#failed[@]})); then echo "failed models: ${failed[*]}"; fi
-echo "open report.html for the leaderboard; compare two runs with: benchsmith diff <id_a> <id_b>"
+echo "open report.html for the leaderboard; compare two runs with: examroom diff <id_a> <id_b>"

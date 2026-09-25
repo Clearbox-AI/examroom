@@ -19,14 +19,14 @@ Options (`--opt k=v`):
 
 The runner's per-item `temperature` is NOT sent: current Claude models reject
 sampling parameters (400).  Sampled items (samples>1) therefore draw from the
-model's own decoding, not a benchsmith-chosen temperature.
+model's own decoding, not an examroom-chosen temperature.
 """
 
 from __future__ import annotations
 
 import os
 
-from benchsmith.backends.base import BackendInfo, Stats, Timer
+from examroom.backends.base import BackendInfo, Stats, Timer
 
 _THINKING = {"off": {"type": "disabled"}, "adaptive": {"type": "adaptive"}, "none": None}
 

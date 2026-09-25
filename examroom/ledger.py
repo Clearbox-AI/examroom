@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from benchsmith.runner import ItemResult, RunResult
+from examroom.runner import ItemResult, RunResult
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -53,7 +53,7 @@ CREATE VIEW IF NOT EXISTS task_scores AS
 
 
 class Ledger:
-    def __init__(self, path: str | Path = "benchsmith.sqlite"):
+    def __init__(self, path: str | Path = "examroom.sqlite"):
         self.path = Path(path)
         self.con = sqlite3.connect(self.path)
         self.con.row_factory = sqlite3.Row

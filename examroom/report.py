@@ -1,11 +1,11 @@
 """Static HTML report over the results ledger.
 
-`benchsmith report` renders one self-contained HTML file (no server, no
+`examroom report` renders one self-contained HTML file (no server, no
 dependencies, works offline).  The ledger holds scores and raw model outputs;
 the suites on disk hold the questions and expected answers — the report joins
 the two (matched by suite content hash, falling back to name@version) so each
 result reads as *question → expected → what the model said*, understandable
-without knowing benchsmith internals.  Views: a per-suite model leaderboard,
+without knowing examroom internals.  Views: a per-suite model leaderboard,
 a sortable run table, per-run browsing with a failures-only toggle, per-item
 history across runs, and a two-run comparison with side-by-side answers.
 """
@@ -16,8 +16,8 @@ import datetime as dt
 import json
 from pathlib import Path
 
-from benchsmith.items import Kind, load_suite
-from benchsmith.ledger import Ledger
+from examroom.items import Kind, load_suite
+from examroom.ledger import Ledger
 
 _TRUNC_OUT = 2000
 _TRUNC_PROMPT = 1500
@@ -120,7 +120,7 @@ def render_report(ledger: Ledger, out: str | Path, suite: str | None = None,
 _TEMPLATE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>benchsmith report</title>
+<title>examroom report</title>
 <style>
 :root{color-scheme:light;
   --bg:#fcfcfb;--surface:#ffffff;--border:#e4e3df;--ink:#0b0b0b;--muted:#52514e;
@@ -184,7 +184,7 @@ summary{cursor:pointer}
 .lb-model{width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .best{font-weight:600}
 </style></head><body><main>
-<h1>benchsmith report</h1>
+<h1>examroom report</h1>
 <div class="sub" id="meta"></div>
 
 <h2>Which model does best on each benchmark?</h2>

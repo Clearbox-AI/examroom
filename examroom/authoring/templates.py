@@ -13,7 +13,7 @@ import hashlib
 import random
 from collections import Counter, defaultdict
 
-from benchsmith.items import Item, Kind, Provenance
+from examroom.items import Item, Kind, Provenance
 
 
 class Builder:

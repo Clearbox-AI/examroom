@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Callable
 
-from benchsmith.backends.base import Backend
-from benchsmith.items import Suite
-from benchsmith.scoring import load_checker, score_item
+from examroom.backends.base import Backend
+from examroom.items import Suite
+from examroom.scoring import load_checker, score_item
 
 
 @dataclass

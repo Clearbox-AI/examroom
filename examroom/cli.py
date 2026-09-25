@@ -8,11 +8,11 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
-from benchsmith.items import load_suite
+from examroom.items import load_suite
 
 
 def cmd_validate(a):
-    from benchsmith.validate import validate_suite
+    from examroom.validate import validate_suite
 
     suite = load_suite(a.suite)
     rep = validate_suite(suite, min_items=a.min_items, balance_tolerance=a.balance_tolerance,
@@ -44,7 +44,7 @@ def cmd_validate(a):
 
 
 def cmd_leakage(a):
-    from benchsmith.leakage import check_leakage
+    from examroom.leakage import check_leakage
 
     rc = 0
     for sp in a.suite:
@@ -96,15 +96,15 @@ def cmd_freeze(a):
 
 
 def cmd_run(a):
-    from benchsmith.backends import load_backend
-    from benchsmith.ledger import Ledger
-    from benchsmith.runner import run_suite
+    from examroom.backends import load_backend
+    from examroom.ledger import Ledger
+    from examroom.runner import run_suite
 
     suite = load_suite(a.suite)
     if not a.allow_unfrozen:
         mf = suite.root / "MANIFEST.json"
         if not mf.exists() or json.loads(mf.read_text()).get("content_hash") != suite.content_hash():
-            print("suite is not frozen or has changed since freeze; run `benchsmith freeze` or pass --allow-unfrozen")
+            print("suite is not frozen or has changed since freeze; run `examroom freeze` or pass --allow-unfrozen")
             return 1
     kw = {}
     for kv in a.opt or []:
@@ -147,7 +147,7 @@ def cmd_run(a):
 
 
 def cmd_runs(a):
-    from benchsmith.ledger import Ledger
+    from examroom.ledger import Ledger
 
     rows = Ledger(a.ledger).runs(suite=a.suite, model=a.model)
     print(f"{'run_id':12s} {'ts':20s} {'suite':14s} {'hash':10s} {'model':40s} {'quant':6s} {'score':6s} {'n':5s} label")
@@ -158,8 +158,8 @@ def cmd_runs(a):
 
 
 def cmd_diff(a):
-    from benchsmith.diff import diff_runs, wilson
-    from benchsmith.ledger import Ledger
+    from examroom.diff import diff_runs, wilson
+    from examroom.ledger import Ledger
 
     d = diff_runs(Ledger(a.ledger), a.run_a, a.run_b)
     if not d.same_benchmark:
@@ -187,8 +187,8 @@ def cmd_diff(a):
 
 def cmd_calibrate(a):
     """T4: KL between a run's sampled completions and the suite's reference_stats.json."""
-    from benchsmith.ledger import Ledger
-    from benchsmith.scoring import load_checker
+    from examroom.ledger import Ledger
+    from examroom.scoring import load_checker
 
     led = Ledger(a.ledger)
     row = led.run(a.run_id)
@@ -217,7 +217,7 @@ def cmd_calibrate(a):
 
 
 def cmd_history(a):
-    from benchsmith.ledger import Ledger
+    from examroom.ledger import Ledger
 
     for r in Ledger(a.ledger).item_history(a.item_id):
         print(f"{r['ts'][:19]}  {r['model']:40s} {(r['quantization'] or '-'):6s} {r['score']:.2f}  {r['protocol']}  {r['label'] or ''}")
@@ -225,8 +225,8 @@ def cmd_history(a):
 
 
 def cmd_report(a):
-    from benchsmith.ledger import Ledger
-    from benchsmith.report import render_report
+    from examroom.ledger import Ledger
+    from examroom.report import render_report
 
     ledger = Ledger(a.ledger)
     out = render_report(ledger, a.out, suite=a.suite, suites_dir=a.suites_dir)
@@ -257,7 +257,7 @@ def cmd_show(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="benchsmith", description="Custom LLM benchmarks with a regression ledger.")
+    ap = argparse.ArgumentParser(prog="examroom", description="Custom LLM benchmarks with a regression ledger.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("validate", help="check schema, duplicates, balance, conventions, leakage")
@@ -284,33 +284,33 @@ def main(argv=None):
     p.add_argument("--max-tokens", type=int, help="override generation budget for every task")
     p.add_argument("--instruction", help="append an instruction to every generative prompt "
                    "(chat models: e.g. 'Answer with only the number.'); recorded in run metadata")
-    p.add_argument("--label"); p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("--label"); p.add_argument("--ledger", default="examroom.sqlite")
     p.add_argument("--workers", type=int, default=1,
                    help="score items concurrently (API backends; hf runs stay sequential)")
     p.add_argument("--dry-run", action="store_true"); p.add_argument("--allow-unfrozen", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_run)
 
     p = sub.add_parser("runs", help="list recorded runs")
-    p.add_argument("--suite"); p.add_argument("--model"); p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("--suite"); p.add_argument("--model"); p.add_argument("--ledger", default="examroom.sqlite")
     p.set_defaults(fn=cmd_runs)
 
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")
-    p.add_argument("--ledger", default="benchsmith.sqlite"); p.set_defaults(fn=cmd_diff)
+    p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_diff)
 
     p = sub.add_parser("calibrate", help="T4: KL of a run's sampled schedules vs the suite's reference_stats.json")
-    p.add_argument("suite"); p.add_argument("run_id"); p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("suite"); p.add_argument("run_id"); p.add_argument("--ledger", default="examroom.sqlite")
     p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_calibrate)
 
     p = sub.add_parser("history", help="every run's result for one item")
-    p.add_argument("item_id"); p.add_argument("--ledger", default="benchsmith.sqlite"); p.set_defaults(fn=cmd_history)
+    p.add_argument("item_id"); p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_history)
 
     p = sub.add_parser("report", help="render the ledger as a self-contained HTML page")
     p.add_argument("--out", default="report.html")
     p.add_argument("--suite", help="only include runs of this suite")
     p.add_argument("--suites-dir", default="suites",
                    help="where to find suite dirs for question/expected-answer display")
-    p.add_argument("--ledger", default="benchsmith.sqlite")
+    p.add_argument("--ledger", default="examroom.sqlite")
     p.set_defaults(fn=cmd_report)
 
     p = sub.add_parser("show", help="print a random sample of items for review")

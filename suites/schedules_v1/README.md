@@ -24,12 +24,12 @@ held-out documents (seed 1000, indices 100 000–149 999).
 
 ```json
 {"id": "sched-kv-0002", "kind": "program", "prompt": "<prefix>", "target": "<full reference document>",
- "checker": "benchsmith.checks.schedules:score", "category": "kv", "max_tokens": 1100,
+ "checker": "examroom.checks.schedules:score", "category": "kv", "max_tokens": 1100,
  "provenance": {"method": "generator", "source": "generate_structured.py@3f9d389", "seed": 1000}}
 ```
 
 `max_tokens` is sized from the reference length (~2.5 chars/token); override per
-run with `benchsmith run … --max-tokens N` (recorded in the run, does not touch
+run with `examroom run … --max-tokens N` (recorded in the run, does not touch
 the suite hash). Decoding is greedy (`temperature: 0`) by default; for T4 you may
 prefer `samples > 1` at temperature 0.7–1.0 — set it per task in a v1.x.
 
@@ -51,7 +51,7 @@ The completion is appended to the prompt and the whole document parsed.
 * **Item score** = mean(T1, T2, T3). Task score = mean over items. The run
   printout also shows the per-tier means.
 * **T4 calibration** — distribution-level, run after the fact:
-  `benchsmith calibrate suites/schedules_v1 <run_id>` parses every stored
+  `examroom calibrate suites/schedules_v1 <run_id>` parses every stored
   completion, builds the same histograms as `reference_stats.json` and reports
   `KL(model ‖ reference)` (nats, additive smoothing 1e-4 over the union of
   support) and total variation per field, plus the mean KL, stored as run metric
@@ -117,7 +117,7 @@ of checks), which is fine for ladder comparisons.
 
 `suite.json` declares `leakage_check: exact`: the format's boilerplate shares
 13-grams with *any* generator output by construction, so n-gram overlap is not
-the right test here. `benchsmith leakage suites/schedules_v1 --corpus <shards>`
+the right test here. `examroom leakage suites/schedules_v1 --corpus <shards>`
 instead flags a training document that is identical to an item's reference or
 starts with an item's prompt prefix (i.e. a seed collision). Checked against a
 50k-document regeneration of the seed-42 source (superset of the 30k used for
@@ -126,6 +126,6 @@ training): 0 collisions.
 ## Freeze policy
 
 `MANIFEST.json` records the content hash, generator path/commit/seed and the
-reference-stats index range. The scorer lives in `benchsmith/checks/` and is
+reference-stats index range. The scorer lived in `benchsmith/checks/` (the package's former name; superseded by schedules_v1.1's suite-local checker.py) and is
 versioned with the repo (`git_commit` in every run); changing a rule means a new
 suite version, not an in-place edit.

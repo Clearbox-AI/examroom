@@ -1,6 +1,6 @@
 import pytest
 
-from benchsmith.backends.anthropic_api import AnthropicBackend
+from examroom.backends.anthropic_api import AnthropicBackend
 
 
 class _Block:

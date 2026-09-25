@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.items import Kind, load_suite
-from benchsmith.scoring import score_item
-from benchsmith.validate import validate_suite
+from examroom.items import Kind, load_suite
+from examroom.scoring import score_item
+from examroom.validate import validate_suite
 
 SUITES_DIR = Path(__file__).resolve().parents[1] / "suites"
 DIRS = sorted(p for p in SUITES_DIR.iterdir() if (p / "suite.json").is_file()) if SUITES_DIR.is_dir() else []
@@ -34,7 +34,7 @@ def test_validates(suite):
 
 def test_frozen_and_hash_matches(suite):
     mf = Path(suite.root) / "MANIFEST.json"
-    assert mf.is_file(), f"{suite.root} is not frozen — run `benchsmith freeze`"
+    assert mf.is_file(), f"{suite.root} is not frozen — run `examroom freeze`"
     frozen = json.loads(mf.read_text())["content_hash"]
     assert frozen == suite.content_hash(), "content (items or checker files) changed since freeze"
 

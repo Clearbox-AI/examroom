@@ -1,4 +1,4 @@
-# benchsmith
+# examroom
 
 Define custom, domain-specific LLM benchmarks and track improvements and
 regressions — per item — across model releases, local vs cloud, and
@@ -6,7 +6,7 @@ quantisations.
 
 Global leaderboards don't tell you whether the new Qwen release helps *your*
 train-dynamics model or whether the Q4 quant broke *your* persona-schedule
-generator. benchsmith is built around three things:
+generator. examroom is built around three things:
 
 1. **An item format where the scoring kind is the primary axis.** Likelihood
    probes (`choice_loglik`, `pair_loglik`) for small models and anything
@@ -26,18 +26,18 @@ generator. benchsmith is built around three things:
 uv pip install -e ".[hf,dev]"     # torch + transformers for local models
 # (CPU-only torch: uv pip install torch --index-url https://download.pytorch.org/whl/cpu)
 
-benchsmith validate suites/world_model_v1          # balance, dedup, conventions
-benchsmith freeze   suites/world_model_v1          # write MANIFEST.json (content hash)
-benchsmith run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-135M --label base
-benchsmith run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-360M --label bigger
-benchsmith runs
-benchsmith diff <run_a> <run_b> --items            # per-task delta, fixed/broken items, p-values
-benchsmith history calendar-3b7f31fb               # one item across every run
-benchsmith report                                  # self-contained report.html: browse runs, outputs, item history, 2-run compare
-benchsmith run       suites/schedules_v1 hf:<ckpt> --max-tokens 1500
-benchsmith calibrate suites/schedules_v1 <run_id>  # T4: KL per field vs reference_stats.json
-benchsmith show     suites/world_model_v1 -n 10    # random sample for hand review
-benchsmith leakage  suites/*_v1 --corpus data/pilot_v1/shards --ngram 13   # streaming, parquet-aware
+examroom validate suites/world_model_v1          # balance, dedup, conventions
+examroom freeze   suites/world_model_v1          # write MANIFEST.json (content hash)
+examroom run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-135M --label base
+examroom run      suites/world_model_v1 hf:HuggingFaceTB/SmolLM2-360M --label bigger
+examroom runs
+examroom diff <run_a> <run_b> --items            # per-task delta, fixed/broken items, p-values
+examroom history calendar-3b7f31fb               # one item across every run
+examroom report                                  # self-contained report.html: browse runs, outputs, item history, 2-run compare
+examroom run       suites/schedules_v1 hf:<ckpt> --max-tokens 1500
+examroom calibrate suites/schedules_v1 <run_id>  # T4: KL per field vs reference_stats.json
+examroom show     suites/world_model_v1 -n 10    # random sample for hand review
+examroom leakage  suites/*_v1 --corpus data/pilot_v1/shards --ngram 13   # streaming, parquet-aware
 ```
 
 Backends: `hf:<model-or-path>` (logprobs, generation, VRAM/RSS, tok/s; options
@@ -58,7 +58,7 @@ and `pair_loglik` refuses to run.
   sliced from held-out generator documents (seed 1000), scored programmatically
   by the suite-local `checker.py` (T1 parse, T2 schema, T3 the generator's
   rules, each cited to a line of `generate_structured.py`), plus
-  `benchsmith calibrate` for T4 (KL vs `reference_stats.json`, 50k held-out docs).
+  `examroom calibrate` for T4 (KL vs `reference_stats.json`, 50k held-out docs).
   Re-author with `scripts/author_schedules.py --generator <path>`; the generator
   is only needed at authoring time.
 * `suites/dialogue_v1.1/` — Track 3: 491 `pair_loglik` minimal pairs (pragmatic /
@@ -83,13 +83,13 @@ One item is a valid suite — that is the point. For generated answers use
 `"kind": "numeric", "target": "42", "tolerance": 0.5` or
 `"kind": "program", "checker": "mypkg.checks:valid_schedule"`.
 
-Programmatic authoring: `benchsmith.authoring.templates.Builder` — see
+Programmatic authoring: `examroom.authoring.templates.Builder` — see
 `scripts/author_world_model.py`.
 
 ## Layout
 
 ```
-benchsmith/
+examroom/
   items.py        Item / Task / Suite, JSONL IO, content hash
   scoring.py      one scorer per kind, protocol fallback
   checks/         program checkers: schedules (T1–T3), calibration (T4), dialogue (qualitative)
@@ -110,7 +110,7 @@ tests/
 
 ## Suites from textbooks
 
-`benchsmith/authoring/openstax.py` extracts solved end-of-chapter exercises from
+`examroom/authoring/openstax.py` extracts solved end-of-chapter exercises from
 OpenStax books via their HTML edition (the PDFs render answer equations as vector
 art; the HTML has real MathML).  Problems and the odd-numbered answer key are
 joined by problem number; answers that parse as a physical quantity become

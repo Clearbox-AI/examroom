@@ -55,7 +55,7 @@ task accuracy = mean over items;  report Wilson 95 % CI (n≈200–300 → ±6 p
   **without**, and the two id lists are concatenated. Options therefore carry
   their own leading space (`" Tuesday"`), matching byte-level BPE's convention
   that a word-initial token includes the space. Prompts never end with
-  whitespace. `benchsmith validate` enforces both.
+  whitespace. `examroom validate` enforces both.
 * Distractors are the same word class and drawn from the same vocabulary as the
   answer (other days, other seasons, other appliances…).
 * **Balance.** Answers cycle over the whole option vocabulary; the authoring
@@ -67,11 +67,11 @@ task accuracy = mean over items;  report Wilson 95 % CI (n≈200–300 → ±6 p
 ## Provenance
 
 * Authored by `scripts/author_world_model.py` (templates × slot-fills, seed
-  1000), hand-reviewed via `benchsmith show`. Re-running the script reproduces
+  1000), hand-reviewed via `examroom show`. Re-running the script reproduces
   the files byte-for-byte.
 * No item text was copied from Simple Wikipedia / FineWeb-Edu. Before use on a
   specific model ladder, run the leakage check against its training shards:
-  `benchsmith validate suites/world_model_v1 --corpus data/pilot_v1/shards --ngram 13`.
+  `examroom validate suites/world_model_v1 --corpus data/pilot_v1/shards --ngram 13`.
 
 ## Freeze policy
 

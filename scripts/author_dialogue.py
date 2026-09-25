@@ -28,8 +28,8 @@ import shutil
 from collections import Counter
 from pathlib import Path
 
-from benchsmith.authoring.templates import PairBuilder
-from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
+from examroom.authoring.templates import PairBuilder
+from examroom.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
 
 SEED = 1000
 AUTHOR = "template:scripts/author_dialogue.py"

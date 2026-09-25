@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.items import load_suite
-from benchsmith.scoring import checker_module
+from examroom.items import load_suite
+from examroom.scoring import checker_module
 
 SUITE = Path(__file__).resolve().parents[1] / "suites" / "crc_pilot_v0.4"
 pytestmark = pytest.mark.skipif(not SUITE.exists(), reason="crc_pilot v0.4 not authored")

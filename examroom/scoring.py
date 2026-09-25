@@ -12,8 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from benchsmith.backends.base import Backend
-from benchsmith.items import Item, Kind, Task
+from examroom.backends.base import Backend
+from examroom.items import Item, Kind, Task
 
 LETTERS = "ABCDEFGH"
 
@@ -37,7 +37,7 @@ def checker_module(mod: str, root: Path | None = None):
     if key not in _MODULE_CACHE:
         if not path.is_file():
             raise FileNotFoundError(f"checker file {mod!r} not found under {root}")
-        name = f"benchsmith_checker_{hashlib.sha1(key.encode()).hexdigest()[:12]}"
+        name = f"examroom_checker_{hashlib.sha1(key.encode()).hexdigest()[:12]}"
         spec = importlib.util.spec_from_file_location(name, path)
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module

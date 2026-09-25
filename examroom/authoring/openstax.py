@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 BASE_URL = "https://openstax.org/books/{book}/pages/{page}"
-_UA = {"User-Agent": "Mozilla/5.0 (benchsmith authoring)"}
+_UA = {"User-Agent": "Mozilla/5.0 (examroom authoring)"}
 
 
 def fetch_page(book: str, page: str, cache_dir: str | Path | None = None) -> str:

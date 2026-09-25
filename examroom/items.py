@@ -5,9 +5,9 @@ On disk a suite is a directory:
     suite.json        # name, version, description, tasks: [{name, file, kind, ...}]
     <task>.jsonl      # one Item per line
     README.md         # human description (optional)
-    MANIFEST.json     # written by `benchsmith freeze` (counts, provenance, content hash)
+    MANIFEST.json     # written by `examroom freeze` (counts, provenance, content hash)
 
-The *kind* of an item decides how it is scored (see benchsmith.scoring), and is
+The *kind* of an item decides how it is scored (see examroom.scoring), and is
 the primary axis of the design: topics are just tags.
 """
 

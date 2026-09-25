@@ -45,14 +45,14 @@ is a per-tier language-degradation number.
 ```sh
 # llama.cpp / Ollama / vLLM server per quantization, via the OpenAI-compatible backend:
 llama-server -m qwen-27b-Q4_K_M.gguf --port 8080   # then:
-benchsmith run suites/crc_pilot_v0.1 openai:qwen-27b --opt base_url=http://localhost:8080/v1 --label q4_k_m
+examroom run suites/crc_pilot_v0.1 openai:qwen-27b --opt base_url=http://localhost:8080/v1 --label q4_k_m
 
 # HF weights with bitsandbytes:
-benchsmith run suites/crc_pilot_v0.1 hf:google/medgemma-... --opt quantization=4bit --label bnb4
+examroom run suites/crc_pilot_v0.1 hf:google/medgemma-... --opt quantization=4bit --label bnb4
 
 # compare two quantizations of the same model, per task, with McNemar p-values:
-benchsmith diff <run_q4> <run_fp16>
-benchsmith report            # HTML leaderboard + per-item history
+examroom diff <run_q4> <run_fp16>
+examroom report            # HTML leaderboard + per-item history
 ```
 
 ## Regenerating / extending

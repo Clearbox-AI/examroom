@@ -7,7 +7,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from benchsmith.items import Kind, Suite, Task
+from examroom.items import Kind, Suite, Task
 
 _WORD = re.compile(r"\w+")
 
@@ -143,7 +143,7 @@ def validate_suite(
         if c > 1:
             rep.errors.append(f"duplicate id {iid} ({c}x)")
     if corpus_dir is not None:
-        from benchsmith.leakage import check_leakage
+        from examroom.leakage import check_leakage
 
         lk = check_leakage(suite, [corpus_dir], n=ngram)
         rep.metrics["leakage"] = {"n": ngram, "docs_scanned": lk.docs_scanned, "items_indexed": lk.items_indexed,

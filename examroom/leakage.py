@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from benchsmith.items import Suite
+from examroom.items import Suite
 
 _WORD = re.compile(r"\w+")
 

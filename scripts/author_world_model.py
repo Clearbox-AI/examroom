@@ -16,8 +16,8 @@ import argparse
 import json
 from pathlib import Path
 
-from benchsmith.authoring.templates import Builder
-from benchsmith.items import Kind, SuiteMeta, Task, save_suite
+from examroom.authoring.templates import Builder
+from examroom.items import Kind, SuiteMeta, Task, save_suite
 
 SEED = 1000
 

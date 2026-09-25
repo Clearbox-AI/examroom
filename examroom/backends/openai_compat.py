@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 
-from benchsmith.backends.base import BackendInfo, Stats, Timer
+from examroom.backends.base import BackendInfo, Stats, Timer
 
 
 class OpenAICompatBackend:

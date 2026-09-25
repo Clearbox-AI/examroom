@@ -1,8 +1,8 @@
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from benchsmith.items import Item, Kind, Suite, SuiteMeta, Task
-from benchsmith.leakage import check_leakage
+from examroom.items import Item, Kind, Suite, SuiteMeta, Task
+from examroom.leakage import check_leakage
 
 
 def mk(items, meta=None, tmp_path=None):

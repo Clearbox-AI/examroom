@@ -10,7 +10,7 @@ tier table and backend commands. This suite is the default in `scripts/run_openr
 ## Setup
 
 The `tool_hard_*` checker executes the model's code in a subprocess that imports pandas,
-so the interpreter running benchsmith needs it:
+so the interpreter running examroom needs it:
 
 ```sh
 uv sync --extra crc          # or --extra dev, which includes it

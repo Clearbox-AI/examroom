@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from pathlib import Path
 
-from benchsmith.authoring.openstax import (
+from examroom.authoring.openstax import (
     Exercise,
     fetch_page,
     parse_exercises,
@@ -27,7 +27,7 @@ from benchsmith.authoring.openstax import (
     sigfig_tolerance,
     split_parts,
 )
-from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
+from examroom.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
 
 BOOK = "college-physics-2e"
 VERSION = "1.1"

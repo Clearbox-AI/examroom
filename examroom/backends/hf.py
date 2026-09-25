@@ -6,7 +6,7 @@ Works for anything `AutoModelForCausalLM` can load, including local checkpoints
 
 from __future__ import annotations
 
-from benchsmith.backends.base import BackendInfo, Stats, Timer
+from examroom.backends.base import BackendInfo, Stats, Timer
 
 
 class HFBackend:

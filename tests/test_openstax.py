@@ -1,11 +1,11 @@
-from benchsmith.authoring.openstax import (
+from examroom.authoring.openstax import (
     flatten_math,
     parse_quantity,
     sigfig_tolerance,
     split_parts,
     strip_html,
 )
-from benchsmith.scoring import first_number
+from examroom.scoring import first_number
 
 MATHML = (
     "<math display=\"inline\"><semantics><mrow><mn>3</mn><mtext>.</mtext>"
@@ -70,8 +70,8 @@ def test_first_number_scientific_forms():
 
 
 def test_numeric_scoring_policies():
-    from benchsmith.items import Item, Kind, Task
-    from benchsmith.scoring import score_numeric
+    from examroom.items import Item, Kind, Task
+    from examroom.scoring import score_numeric
 
     class Echo:
         def __init__(self, text): self.text = text

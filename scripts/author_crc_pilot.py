@@ -27,7 +27,7 @@ import random
 from collections import Counter
 from pathlib import Path
 
-from benchsmith.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
+from examroom.items import Item, Kind, Provenance, SuiteMeta, Task, save_suite
 
 SEED = 7000
 PROV = lambda: Provenance(method="template", source="scripts/author_crc_pilot.py", seed=SEED)

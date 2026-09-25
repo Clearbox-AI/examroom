@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.items import load_suite
-from benchsmith.ledger import Ledger
-from benchsmith.runner import run_suite
-from benchsmith.scoring import checker_module
+from examroom.items import load_suite
+from examroom.ledger import Ledger
+from examroom.runner import run_suite
+from examroom.scoring import checker_module
 
 SUITE = Path(__file__).resolve().parents[1] / "suites" / "schedules_v1.1"
 pytestmark = pytest.mark.skipif(not SUITE.exists(), reason="schedules suite not authored")
@@ -96,7 +96,7 @@ def test_program_kind_runs_through_runner_and_ledger(suite, ck, tmp_path):
         supports_generate = True
 
         def __init__(self):
-            from benchsmith.backends.base import BackendInfo, Stats
+            from examroom.backends.base import BackendInfo, Stats
             self.info = BackendInfo(backend="dummy", model="reference")
             self.stats = Stats()
             self.lookup = {it.prompt: ref_out(it) for _, it in suite.iter_items()}

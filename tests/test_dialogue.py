@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from benchsmith.items import Item, Kind, load_suite
-from benchsmith.scoring import checker_module
-from benchsmith.validate import validate_suite
+from examroom.items import Item, Kind, load_suite
+from examroom.scoring import checker_module
+from examroom.validate import validate_suite
 
 SUITE = Path(__file__).resolve().parents[1] / "suites" / "dialogue_v1.1"
 pytestmark = pytest.mark.skipif(not SUITE.exists(), reason="dialogue suite not authored")
