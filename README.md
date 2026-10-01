@@ -40,14 +40,45 @@ examroom show     suites/world_model_v1 -n 10    # random sample for hand review
 examroom leakage  suites/*_v1 --corpus data/pilot_v1/shards --ngram 13   # streaming, parquet-aware
 ```
 
-Backends: `hf:<model-or-path>` (logprobs, generation, VRAM/RSS, tok/s; options
-`--opt dtype=bf16 --opt quantization=4bit --opt batch_size=16`),
+Backends: `hf:<model-or-path>` (logprobs, generation, VRAM/RSS, tok/s, parameter
+count and weight footprint; options `--opt dtype=bf16 --opt quantization=4bit
+--opt batch_size=16`; generation uses the tokenizer's chat template when it has
+one, `--opt chat_template=off` for raw prompts, `--opt reasoning=off` for
+Qwen3-style thinking models),
 `anthropic:<model>` (Claude via the native SDK; `--opt thinking=off|adaptive|none
 --opt effort=low…max`; temperature is never sent — current Claude models reject
 sampling params), `openai:<model>` (any OpenAI-compatible endpoint via
 `--opt base_url=…`), `dummy:uniform` for dry runs.  Chat backends are generation
 only: likelihood items fall back to `choice_generate` (recorded in the ledger)
 and `pair_loglik` refuses to run.
+
+## Smallest good-enough model
+
+"Good enough" is a minimum per task, not the suite mean: the mean is dominated by
+easy, saturated tasks, while a deployment fails on its weakest required capability.
+Put the minimums in the suite's `meta.acceptance` (task globs; suite `meta` is not
+part of the content hash, so this does not unfreeze a suite), or keep per-use-case
+profiles outside it:
+
+```json
+"meta": {"acceptance": {"*": 0.9, "mcq_*": 0.75, "tool_hard_*": 0.85}}
+```
+
+```bash
+# record size with every run (API backends can't report it; hf fills n_params/weights_mb itself)
+examroom run suites/crc_pilot_v0.4 openai:qwen3-4b --opt base_url=http://localhost:8080/v1 \
+    --opt n_params=4B --opt quantization=Q4_K_M --opt weights_mb=2500 --label q4
+examroom annotate <run_id> n_params=30.5B active_params=3.3B    # fix up past runs
+examroom select suites/crc_pilot_v0.4                           # uses meta.acceptance
+examroom select suites/crc_pilot_v0.4 --criteria rag_profile.json --min 'tool_hard_*=0.9' --size weights_mb
+```
+
+`select` prints a task × run matrix ordered by size and names the smallest run that
+clears every gate (exit status 1 if none does). When several patterns match a task
+the last one wins. A task passes when the 95% Wilson *lower bound* of its score
+clears the minimum (`--gate point` compares the raw score instead), so small tasks
+can't pass on luck: 12/12 only demonstrates 0.76, and `select` flags gates that a
+task is too small to ever clear.
 
 ## Suites
 
@@ -97,6 +128,7 @@ examroom/
   runner.py       run a suite, collect per-item results + resource stats
   ledger.py       SQLite: runs, results, item history
   diff.py         run-vs-run comparison, Wilson CI, exact McNemar
+  selection.py    per-task acceptance gates, smallest passing model
   validate.py     schema, dedup, balance, conventions (+ leakage via --corpus)
   leakage.py      streaming n-gram / exact-document overlap vs training shards
   authoring/      template Builder with rebalancing

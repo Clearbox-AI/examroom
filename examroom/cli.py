@@ -106,11 +106,20 @@ def cmd_run(a):
         if not mf.exists() or json.loads(mf.read_text()).get("content_hash") != suite.content_hash():
             print("suite is not frozen or has changed since freeze; run `examroom freeze` or pass --allow-unfrozen")
             return 1
-    kw = {}
+    from examroom.selection import SIZE_KEYS, parse_size
+
+    kw, size = {}, {}
     for kv in a.opt or []:
         k, v = kv.split("=", 1)
-        kw[k] = int(v) if v.isdigit() else v
+        if k in SIZE_KEYS:  # model metadata for `examroom select`, not a backend option
+            size[k] = parse_size(k, v)
+        else:
+            kw[k] = int(v) if v.isdigit() else v
     backend = load_backend(a.backend, **kw)
+    for k, v in size.items():  # explicit values win over what the backend measured
+        setattr(backend.info, k, v)
+    if backend.info.quantization is None and isinstance(kw.get("quantization"), str):
+        backend.info.quantization = kw["quantization"]  # e.g. the GGUF quant behind an openai: server
     overrides = {k: v for k, v in {"max_tokens": a.max_tokens, "instruction": a.instruction}.items() if v}
     overrides = overrides or None
 
@@ -149,12 +158,64 @@ def cmd_run(a):
 def cmd_runs(a):
     from examroom.ledger import Ledger
 
+    from examroom.selection import fmt_size
+
     rows = Ledger(a.ledger).runs(suite=a.suite, model=a.model)
-    print(f"{'run_id':12s} {'ts':20s} {'suite':14s} {'hash':10s} {'model':40s} {'quant':6s} {'score':6s} {'n':5s} label")
+    print(f"{'run_id':12s} {'ts':20s} {'suite':14s} {'hash':10s} {'model':40s} {'params':6s} {'quant':6s} "
+          f"{'score':6s} {'n':5s} label")
     for r in rows:
         print(f"{r['run_id']:12s} {r['ts'][:19]:20s} {r['suite'] + '@' + r['suite_version']:14s} {r['suite_hash'][:8]:10s} "
-              f"{r['model'][:40]:40s} {(r['quantization'] or '-'):6s} {r['score']:.3f}  {r['n_items']:<5d}{r['label'] or ''}")
+              f"{r['model'][:40]:40s} {fmt_size(r['n_params']):6s} {(r['quantization'] or '-'):6s} {r['score']:.3f}  "
+              f"{r['n_items']:<5d}{r['label'] or ''}")
     return 0
+
+
+def cmd_annotate(a):
+    from examroom.ledger import Ledger
+    from examroom.selection import SIZE_KEYS, parse_size
+
+    fields = {}
+    for kv in a.fields:
+        k, _, v = kv.partition("=")
+        if k == "quantization":
+            fields[k] = v
+        elif k in SIZE_KEYS:
+            fields[k] = parse_size(k, v)
+        else:
+            print(f"unknown field {k!r}; expected quantization or one of {', '.join(SIZE_KEYS)}")
+            return 1
+    led = Ledger(a.ledger)
+    led.annotate(a.run_id, **fields)
+    print(f"run {led.run(a.run_id)['run_id']}: " + "  ".join(f"{k}={v}" for k, v in fields.items()))
+    return 0
+
+
+def cmd_select(a):
+    from examroom.ledger import Ledger
+    from examroom.selection import render, select
+
+    suite = load_suite(a.suite)
+    acc = suite.meta.meta.get("acceptance") or {}
+    criteria = list(acc.items())
+    if a.criteria:
+        criteria += list(json.loads(Path(a.criteria).read_text()).items())
+    for kv in a.min or []:
+        pat, _, v = kv.rpartition("=")
+        if not pat:
+            print(f"--min expects TASK_GLOB=MIN, got {kv!r}")
+            return 1
+        criteria.append((pat, v))
+    try:
+        criteria = [(p, float(v)) for p, v in criteria]
+    except ValueError as e:
+        print(f"acceptance minimums must be numbers: {e}")
+        return 1
+    if bad := [p for p, v in criteria if not 0 <= v <= 1]:
+        print(f"acceptance minimums must be in [0, 1]: {bad}")
+        return 1
+    sel = select(Ledger(a.ledger), suite, criteria, gate=a.gate, size_key=a.size)
+    print(render(sel))
+    return 1 if sel.gated and not any(c.passed for c in sel.candidates) else 0
 
 
 def cmd_diff(a):
@@ -279,7 +340,8 @@ def main(argv=None):
 
     p = sub.add_parser("run", help="evaluate a model on a suite and record to the ledger")
     p.add_argument("suite"); p.add_argument("backend", help="hf:<model> | openai:<model> | dummy:uniform")
-    p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8)")
+    p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8); "
+                   "n_params=4B, active_params=3B, weights_mb=2500 record model size for `select`")
     p.add_argument("--task", action="append"); p.add_argument("--limit", type=int)
     p.add_argument("--max-tokens", type=int, help="override generation budget for every task")
     p.add_argument("--instruction", help="append an instruction to every generative prompt "
@@ -293,6 +355,24 @@ def main(argv=None):
     p = sub.add_parser("runs", help="list recorded runs")
     p.add_argument("--suite"); p.add_argument("--model"); p.add_argument("--ledger", default="examroom.sqlite")
     p.set_defaults(fn=cmd_runs)
+
+    p = sub.add_parser("annotate", help="record model size / quantization on a past run (API backends cannot report it)")
+    p.add_argument("run_id")
+    p.add_argument("fields", nargs="+", metavar="KEY=VAL",
+                   help="n_params=27B | active_params=3B | weights_mb=16500 | quantization=Q4_K_M")
+    p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_annotate)
+
+    p = sub.add_parser("select", help="smallest model whose runs clear every per-task minimum")
+    p.add_argument("suite")
+    p.add_argument("--min", action="append", metavar="TASK_GLOB=MIN",
+                   help="per-task minimum, e.g. 'tool_hard_*=0.9'; applied after the suite's meta.acceptance "
+                        "and --criteria (last matching pattern wins)")
+    p.add_argument("--criteria", help="JSON file {task_glob: minimum}, e.g. a use-case profile")
+    p.add_argument("--gate", choices=["lower", "point"], default="lower",
+                   help="compare the minimum with the 95%% Wilson lower bound (default) or the raw score")
+    p.add_argument("--size", choices=["n_params", "active_params", "weights_mb"], default="n_params",
+                   help="what 'smallest' means")
+    p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_select)
 
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")

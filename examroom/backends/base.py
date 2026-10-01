@@ -14,7 +14,9 @@ class BackendInfo:
     dtype: str | None = None
     quantization: str | None = None
     device: str | None = None
-    n_params: int | None = None
+    n_params: int | None = None      # total parameters (what must fit in memory)
+    active_params: int | None = None # per-token parameters of an MoE model (what drives latency)
+    weights_mb: float | None = None  # weight footprint: GGUF file size, or HF memory footprint
     revision: str | None = None
     extra: dict = field(default_factory=dict)
 
