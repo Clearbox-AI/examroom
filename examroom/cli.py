@@ -267,7 +267,8 @@ def cmd_models_list(a):
         print(f"no models in {a.registry}; add one with `examroom models add`")
         return 0
     for mid, e in sorted(reg.models.items()):
-        print(f"{mid}  params={fmt_size(e.get('n_params'))}  active={fmt_size(e.get('active_params'))}"
+        active = "dense" if e.get("active_params") == e.get("n_params") else fmt_size(e.get("active_params"))
+        print(f"{mid}  params={fmt_size(e.get('n_params'))}  active={active}"
               + (f"  aliases={','.join(e['aliases'])}" if e.get("aliases") else ""))
         for prec, q in sorted(e.get("quants", {}).items()):
             tiers = tiers_for(e.get("n_params"), q.get("weights_mb"))
@@ -280,13 +281,56 @@ def cmd_models_add(a):
     from examroom.registry import Registry, fmt_size
 
     reg = Registry.load(a.registry)
+    if a.dense and a.active:
+        print("--dense and --active are exclusive")
+        return 1
     try:
-        e = reg.add(a.model_id, a.params, a.active, a.alias, a.source)
+        e = reg.add(a.model_id, a.params, a.params if a.dense else a.active, a.alias, a.source)
     except ValueError as err:
         print(err)
         return 1
     reg.save()
     print(f"{a.model_id}: params={fmt_size(e['n_params'])} active={fmt_size(e['active_params'])} -> {a.registry}")
+    return 0
+
+
+def cmd_models_add_hub(a):
+    from examroom.hub import model_facts
+    from examroom.registry import Registry, fmt_size
+
+    reg = Registry.load(a.registry)
+    if a.dense and a.active:
+        print("--dense and --active are exclusive")
+        return 1
+    f = model_facts(a.repo)
+    try:
+        e = reg.add(a.repo, f["n_params"], f["n_params"] if a.dense else a.active, a.alias,
+                    source=f"hf safetensors metadata @ {f['revision'][:12]}" + (f"; {a.source}" if a.source else ""),
+                    card=a.card, hub={"repo": a.repo, "revision": f["revision"]})
+    except ValueError as err:
+        print(err)
+        return 1
+    if f["precision"]:
+        reg.set_quant(a.repo, f["precision"], f["quant"])
+    reg.save()
+    print(f"{a.repo}: params={fmt_size(e['n_params'])} active={fmt_size(e['active_params'])} "
+          f"{f['precision']}={fmt_size(f['quant']['weights_mb'], 'weights_mb')} -> {a.registry}")
+    return 0
+
+
+def cmd_models_quant_hub(a):
+    from examroom.hub import quant_facts
+    from examroom.registry import Registry, fmt_size
+
+    reg = Registry.load(a.registry)
+    try:
+        q = reg.set_quant(a.model_id, a.precision, quant_facts(a.repo, a.match))
+    except (KeyError, ValueError) as err:
+        print(err.args[0])
+        return 1
+    reg.save()
+    print(f"{a.model_id} {a.precision}: {fmt_size(q['weights_mb'], 'weights_mb')} from {a.repo}"
+          + (f" ({q['file']})" if q.get("file") else "") + f" -> {a.registry}")
     return 0
 
 
@@ -477,6 +521,7 @@ def main(argv=None):
     q.add_argument("model_id", help="canonical id, e.g. Qwen/Qwen3-30B-A3B")
     q.add_argument("--params", required=True, help="total parameters, e.g. 30.5B")
     q.add_argument("--active", help="active parameters per token (MoE), e.g. 3.3B")
+    q.add_argument("--dense", action="store_true", help="not an MoE: active parameters = total")
     q.add_argument("--alias", action="append", default=[],
                    help="other names runs use for it: OpenRouter id, Ollama tag, local path")
     q.add_argument("--source", help="where the counts come from, e.g. 'config.json' or a model card URL")
@@ -487,6 +532,21 @@ def main(argv=None):
     g.add_argument("--weights-mb", type=float, help="footprint in MiB")
     g.add_argument("--file", help="weights file (e.g. a GGUF): size and sha256 are recorded")
     q.set_defaults(fn=cmd_models_quant)
+    q = msub.add_parser("add-hub", help="register a model from its Hugging Face repo: total parameters and "
+                                        "native-precision footprint from the safetensors metadata")
+    q.add_argument("repo", help="e.g. Qwen/Qwen3-30B-A3B-Instruct-2507 (also the registry id)")
+    q.add_argument("--active", help="active parameters per token (MoE), from the model card, e.g. 3.3B")
+    q.add_argument("--dense", action="store_true", help="not an MoE: active parameters = total")
+    q.add_argument("--card", help="the model card's own statement of its size, kept verbatim")
+    q.add_argument("--alias", action="append", default=[], help="other names runs use for it (OpenRouter id …)")
+    q.add_argument("--source", help="extra provenance, e.g. where --active comes from")
+    q.set_defaults(fn=cmd_models_add_hub)
+    q = msub.add_parser("quant-hub", help="record a precision's footprint from a Hugging Face repo "
+                                          "(all safetensors shards, or one GGUF; mmproj files excluded)")
+    q.add_argument("model_id"); q.add_argument("precision", help="fp8 | Q4_0 | Q4_K_M …")
+    q.add_argument("repo", help="e.g. Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
+    q.add_argument("--match", help="glob picking one GGUF when the repo holds several")
+    q.set_defaults(fn=cmd_models_quant_hub)
 
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")

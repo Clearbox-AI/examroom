@@ -101,11 +101,23 @@ parameter count (8 bits/weight when a hosted API does not state its precision)
 and marked `~`.
 
 ```bash
-examroom models add Qwen/Qwen3-30B-A3B --params 30.5B --active 3.3B \
-    --alias qwen/qwen3-30b-a3b --source "config.json"
-examroom models quant Qwen/Qwen3-30B-A3B Q4_K_M --file Qwen3-30B-A3B-Q4_K_M.gguf   # size + sha256
+# from the Hub: total parameters + native footprint from safetensors metadata;
+# active parameters from the model card, kept verbatim with --card
+examroom models add-hub Qwen/Qwen3-30B-A3B-Instruct-2507 --active 3.3B \
+    --alias qwen/qwen3-30b-a3b-instruct-2507 --card "30.5B in total and 3.3B activated"
+examroom models add-hub Qwen/Qwen3.8-27B --dense --alias qwen/qwen3.8-27b
+examroom models quant-hub Qwen/Qwen3-30B-A3B-Instruct-2507 fp8 Qwen/Qwen3-30B-A3B-Instruct-2507-FP8
+examroom models quant-hub google/gemma-4-31B-it QAT-Q4_0 google/gemma-4-31B-it-qat-q4_0-gguf  # GGUF size + sha256
+# by hand / from a local file
+examroom models add org/model --params 4B --dense
+examroom models quant org/model Q4_K_M --file model-Q4_K_M.gguf
 examroom models list
 ```
+
+Totals count every stored tensor (vision encoder, MTP heads, n-gram embeddings),
+since that is what has to be loaded; multimodal projector files are excluded from
+footprints. Aliases map API names (OpenRouter's model list gives each model's
+`hugging_face_id`) to the registry id.
 
 A **run profile** fixes how the model is driven, so runs are comparable: only runs
 sharing a profile are ranked together. `examroom profiles` lists them:

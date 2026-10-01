@@ -173,3 +173,37 @@ def test_cli_profiled_run_and_models(tmp_path, capsys):
                  "--profile", "think"]) == 0
     out = capsys.readouterr().out
     assert "tier=tiny" in out and "profile=think@1" in out and "tiers=tiny,small,local" in out
+
+
+class _Sib:
+    def __init__(self, name, size, sha=None):
+        self.rfilename, self.size = name, size
+        self.lfs = type("L", (), {"sha256": sha})() if sha else None
+
+
+def test_hub_weight_files_and_facts(monkeypatch, tmp_path, capsys):
+    import examroom.hub as hub
+
+    gguf = [_Sib("README.md", 10), _Sib("m-mmproj.gguf", 5 * 2**20, "aa"), _Sib("m_q4_0.gguf", 300 * 2**20, "bb")]
+    assert [s.rfilename for s in hub.weight_files(gguf)] == ["m_q4_0.gguf"]       # projector excluded
+    two = gguf + [_Sib("m_q8_0.gguf", 2**20, "cc")]
+    with pytest.raises(ValueError, match="--match"):
+        hub.weight_files(two)
+    assert [s.rfilename for s in hub.weight_files(two, "*q8_0*")] == ["m_q8_0.gguf"]
+
+    shards = [_Sib("model-00001.safetensors", 2**30), _Sib("model-00002.safetensors", 2**30), _Sib("x.json", 1)]
+    st = type("S", (), {"total": 1_100_000_000, "parameters": {"BF16": 1_099_999_990, "I64": 10}})()
+    infos = {"org/m": type("I", (), {"sha": "abc123", "siblings": shards, "safetensors": st})(),
+             "org/m-gguf": type("I", (), {"sha": "def456", "siblings": gguf, "safetensors": None})()}
+    monkeypatch.setattr(hub, "_info", lambda repo: infos[repo])
+    reg = str(tmp_path / "models.json")
+    assert main(["models", "--registry", reg, "add-hub", "org/m", "--active", "1B", "--dense"]) == 1
+    assert main(["models", "--registry", reg, "add-hub", "org/m", "--dense", "--alias", "m"]) == 0
+    assert main(["models", "--registry", reg, "quant-hub", "m", "Q4_0", "org/m-gguf"]) == 0
+    e = Registry.load(reg).models["org/m"]
+    assert e["n_params"] == e["active_params"] == 1_100_000_000 and e["hub"]["revision"] == "abc123"
+    assert e["quants"]["bf16"] == {"weights_mb": 2048.0, "repo": "org/m", "revision": "abc123", "files": 2}
+    assert e["quants"]["Q4_0"]["sha256"] == "bb" and e["quants"]["Q4_0"]["weights_mb"] == 300.0
+    capsys.readouterr()
+    main(["models", "--registry", reg, "list"])
+    assert "active=dense" in capsys.readouterr().out

@@ -138,7 +138,10 @@ class Registry:
                 return mid
         return None
 
-    def add(self, model_id: str, n_params, active_params=None, aliases=(), source: str | None = None) -> dict:
+    def add(self, model_id: str, n_params, active_params=None, aliases=(), source: str | None = None,
+            **extra) -> dict:
+        """Register or update a model.  `extra` keeps provenance fields as given, e.g.
+        `card` (the model card's own wording) or `hub` ({repo, revision})."""
         if (other := self.find(model_id)) and other != model_id:
             raise ValueError(f"{model_id!r} is already an alias of {other!r}")
         for a in aliases:
@@ -150,8 +153,19 @@ class Registry:
         e["aliases"] = sorted(set(e.get("aliases", [])) | set(aliases))
         if source:
             e["source"] = source
+        e.update({k: v for k, v in extra.items() if v is not None})
         e.setdefault("quants", {})
         return e
+
+    def set_quant(self, model_id: str, precision: str, facts: dict) -> dict:
+        """Record a precision's footprint with its provenance (e.g. hub repo, file, sha256)."""
+        mid = self.find(model_id)
+        if mid is None:
+            raise KeyError(f"{model_id!r} is not registered; `examroom models add` it first")
+        if "weights_mb" not in facts:
+            raise ValueError("a quant entry needs weights_mb")
+        self.models[mid].setdefault("quants", {})[precision] = dict(facts)
+        return self.models[mid]["quants"][precision]
 
     def add_quant(self, model_id: str, precision: str, weights_mb: float | None = None,
                   file: str | Path | None = None) -> dict:
