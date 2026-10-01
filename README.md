@@ -137,6 +137,45 @@ examroom run suites/crc_pilot_v0.4 openai:qwen/qwen3-30b-a3b --profile nothink \
 examroom select suites/crc_pilot_v0.4 --tier local --profile nothink --size weights_mb
 ```
 
+## Publishing: suites space, held-out splits, results, page
+
+Curated suites live on the Hugging Face Hub under Clearbox-AI, separate from this
+engine. Any command that takes a suite also takes a Hub reference, downloaded
+and cached; pin a revision, since a suite's `checker.py` runs when it is scored:
+
+```bash
+examroom run hf://Clearbox-AI/examroom-suites/crc_pilot_v0.4@<rev> openai:… --profile nothink
+```
+
+The leaderboard ranks on **held-out** items. `split` divides a frozen suite into
+a public suite and a `<name>-heldout` suite (both frozen), stratified by task and
+category and deterministic in the seed. `--group-id` keeps related items on the
+same side, e.g. translations. The public half carries the held-out
+`HELDOUT_MANIFEST.json`, so anyone can verify the hash the leaderboard ranks on.
+`split` also warns when a public README quotes a held-out item.
+
+```bash
+examroom split suites/crc_pilot_v0.4 --public out/crc_pilot_v0.4 \
+    --heldout private/crc_pilot_v0.4 --group-id='-(en|it)-'
+examroom publish suite out/crc_pilot_v0.4 --repo Clearbox-AI/examroom-suites
+examroom publish suite private/crc_pilot_v0.4 --repo Clearbox-AI/examroom-suites-heldout  # must be private
+```
+
+Runs travel as JSON records: `export` writes `<suite>@<version>/<run_id>.json`.
+Held-out runs export per-task aggregates only, with no item ids or outputs. The page
+is built from those records, the registry and a `board.json` that lists the ranked
+suites by exact hash and the profiles:
+
+```bash
+examroom export --profiled --out results/
+examroom leaderboard results/ --board board.json --registry models.json --out leaderboard.html
+examroom publish results results/ --repo Clearbox-AI/examroom-results --registry models.json --board board.json
+examroom publish page leaderboard.html --repo Clearbox-AI/examroom-leaderboard   # a static Space
+```
+
+`publish` never creates repos, refuses to put a held-out suite in a public repo,
+and refuses to overwrite a published suite directory with different content.
+
 ## Suites
 
 * `suites/world_model_v1/` — Track 1 of the tiny-model capability brief: 1223
@@ -187,6 +226,10 @@ examroom/
   selection.py    per-task acceptance gates, smallest passing model
   registry.py     model registry: parameter counts, weight footprints, tiers
   profiles.py     run profiles (nothink, think): the protocol runs are ranked under
+  splits.py       public / held-out splits
+  export.py       portable JSON run records (held-out: aggregates only)
+  leaderboard.py  static leaderboard page from run records + registry + board.json
+  hub.py          Hugging Face Hub: model facts, hf:// suites, guarded publishing
   validate.py     schema, dedup, balance, conventions (+ leakage via --corpus)
   leakage.py      streaming n-gram / exact-document overlap vs training shards
   authoring/      template Builder with rebalancing

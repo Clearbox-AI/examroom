@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 
 from examroom.items import load_suite
@@ -64,35 +62,35 @@ def cmd_leakage(a):
 
 
 def cmd_freeze(a):
+    from examroom.items import write_manifest
+
     suite = load_suite(a.suite)
     try:
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
-    except Exception:
-        commit = None
-    manifest = {
-        "suite": suite.name, "version": suite.version, "content_hash": suite.content_hash(),
-        "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"), "git_commit": commit,
-        "n_items": len(suite),
-        "meta": suite.meta.meta,
-        "files": {
-            t.file: {
-                "task": t.name, "kind": str(t.kind), "n_items": len(suite.items[t.name]),
-                "provenance": dict(Counter(f"{i.provenance.method}:{i.provenance.source}" for i in suite.items[t.name])),
-                "seeds": sorted({i.provenance.seed for i in suite.items[t.name] if i.provenance.seed is not None}),
-                "categories": dict(Counter(i.category for i in suite.items[t.name])),
-            } for t in suite.tasks
-        },
-    }
-    out = suite.root / "MANIFEST.json"
-    if out.exists() and not a.force:
-        old = json.loads(out.read_text())
-        if old.get("content_hash") != manifest["content_hash"]:
-            print(f"REFUSING: {out} exists with hash {old.get('content_hash')} != {manifest['content_hash']}.\n"
-                  f"A frozen suite must not change in place — bump the version (new directory) or pass --force.")
-            return 1
-    out.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"wrote {out} (hash {manifest['content_hash']}, {manifest['n_items']} items)")
+        manifest = write_manifest(suite, force=a.force)
+    except FileExistsError as e:
+        print(e.args[0])
+        return 1
+    print(f"wrote {suite.root / 'MANIFEST.json'} (hash {manifest['content_hash']}, {manifest['n_items']} items)")
     return 0
+
+
+def cmd_split(a):
+    from examroom.splits import quoted_heldout, split_suite
+
+    try:
+        public, heldout = split_suite(a.suite, a.public, a.heldout, heldout_frac=a.frac, seed=a.seed,
+                                      group_id=a.group_id)
+    except (ValueError, FileExistsError) as e:
+        print(e.args[0])
+        return 1
+    for s in (public, heldout):
+        counts = "  ".join(f"{t.name}={len(s.items[t.name])}" for t in s.tasks)
+        print(f"{s.name}@{s.version}  hash={s.content_hash()}  {len(s)} items  -> {s.root}\n    {counts}")
+    hits = quoted_heldout(public.root, heldout)
+    for f, iid in hits:
+        print(f"WARN {public.root / f} quotes held-out item {iid}: edit it before publishing")
+    print(f"public {public.root} carries HELDOUT_MANIFEST.json; keep {heldout.root} in a private repo only")
+    return 1 if hits else 0
 
 
 def cmd_run(a):
@@ -348,6 +346,52 @@ def cmd_models_quant(a):
     return 0
 
 
+def cmd_export(a):
+    from examroom.export import write_exports
+    from examroom.ledger import Ledger
+
+    led = Ledger(a.ledger)
+    ids = list(a.run_id)
+    if a.profiled:
+        ids += [r["run_id"] for r in led.runs(suite=a.suite) if json.loads(r["backend_json"]).get("profile")]
+    if not ids:
+        print("no runs to export: name run ids or pass --profiled")
+        return 1
+    for path in write_exports(led, sorted(set(ids)), a.out):
+        print(path)
+    return 0
+
+
+def cmd_leaderboard(a):
+    from examroom.export import load_exports
+    from examroom.leaderboard import load_board, render_leaderboard
+    from examroom.registry import Registry
+
+    records = load_exports(a.results)
+    board = load_board(a.board)
+    out = render_leaderboard(records, board, Registry.load(a.registry), a.out)
+    print(f"wrote {out} ({len(records)} run records, {len(board['suites'])} suites, "
+          f"profiles {', '.join(board['profiles'])})")
+    return 0
+
+
+def cmd_publish(a):
+    from examroom import hub
+
+    try:
+        if a.what == "suite":
+            print(hub.publish_suite(a.path, a.repo))
+        elif a.what == "results":
+            extra = {k: v for k, v in (("models.json", a.registry), ("board.json", a.board)) if v}
+            print(hub.publish_results(a.path, a.repo, extra))
+        else:
+            print(hub.publish_page(a.path, a.repo))
+    except (ValueError, PermissionError, FileExistsError) as e:
+        print(f"REFUSING: {e}")
+        return 1
+    return 0
+
+
 def cmd_diff(a):
     from examroom.diff import diff_runs, wilson
     from examroom.ledger import Ledger
@@ -468,8 +512,18 @@ def main(argv=None):
     p = sub.add_parser("freeze", help="write MANIFEST.json with content hash and provenance")
     p.add_argument("suite"); p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_freeze)
 
+    p = sub.add_parser("split", help="split a frozen suite into a public and a held-out suite (both frozen)")
+    p.add_argument("suite"); p.add_argument("--public", required=True, help="output directory of the public split")
+    p.add_argument("--heldout", required=True, help="output directory of the held-out split (keep private)")
+    p.add_argument("--frac", type=float, default=0.5, help="held-out share of each (task, category) stratum")
+    p.add_argument("--group-id", metavar="REGEX",
+                   help="items whose ids match once REGEX is removed stay together, e.g. --group-id='-(en|it)-' "
+                        "keeps translations on the same side")
+    p.add_argument("--seed", type=int, default=0); p.set_defaults(fn=cmd_split)
+
     p = sub.add_parser("run", help="evaluate a model on a suite and record to the ledger")
     p.add_argument("suite"); p.add_argument("backend", help="hf:<model> | openai:<model> | dummy:uniform")
+    # every command that takes a suite also accepts hf://<org>/<repo>/<suite dir>[@<revision>]
     p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8); "
                    "n_params=4B, active_params=3B, weights_mb=2500 record model size for `select`; "
                    "model_id=<registry id> when the backend's model name is not a registry alias")
@@ -547,6 +601,28 @@ def main(argv=None):
     q.add_argument("repo", help="e.g. Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
     q.add_argument("--match", help="glob picking one GGUF when the repo holds several")
     q.set_defaults(fn=cmd_models_quant_hub)
+
+    p = sub.add_parser("export", help="write runs as portable JSON records for a results repo "
+                                      "(held-out suites: per-task aggregates only)")
+    p.add_argument("run_id", nargs="*"); p.add_argument("--out", required=True)
+    p.add_argument("--profiled", action="store_true", help="also every run recorded under a profile")
+    p.add_argument("--suite", help="with --profiled: only this suite")
+    p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_export)
+
+    p = sub.add_parser("leaderboard", help="render the public leaderboard page from exported runs")
+    p.add_argument("results", help="directory of exported run records (searched recursively)")
+    p.add_argument("--board", required=True, help="board.json: ranked suites (by hash) and profiles")
+    p.add_argument("--registry", default="models.json"); p.add_argument("--out", default="leaderboard.html")
+    p.set_defaults(fn=cmd_leaderboard)
+
+    p = sub.add_parser("publish", help="upload to the Hugging Face Hub (repos must exist; needs `hf auth login`)")
+    p.add_argument("what", choices=["suite", "results", "page"])
+    p.add_argument("path", help="suite directory | exported results directory | leaderboard.html")
+    p.add_argument("--repo", required=True, help="dataset repo (suite, results) or static Space (page), "
+                                                 "e.g. Clearbox-AI/examroom-suites")
+    p.add_argument("--registry", help="results: also upload this registry as models.json")
+    p.add_argument("--board", help="results: also upload this board file as board.json")
+    p.set_defaults(fn=cmd_publish)
 
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")

@@ -42,6 +42,10 @@ Data flow: `items.load_suite` → `backends.load_backend("<type>:<model>")` → 
 - `tests/test_suites_conform.py` automatically checks every `suites/*` directory: it validates the suite, checks that the frozen hash matches, and checks that reference answers score 1.0 through the real scorer. It needs no per-suite test code. The legacy `schedules_v1`/`dialogue_v1` suites point at a checker module that no longer exists, so they skip there.
 - `scripts/author_*.py` regenerate suites. `author_schedules.py` needs the external generator via `--generator`. Use `examroom.authoring.templates.Builder` for templated items with answer rebalancing, and `examroom.authoring.openstax` for textbook extraction.
 
+## Leaderboard pipeline
+
+Suites → `split` (public + `<name>-heldout`, both frozen) → `run --profile` → `export` (JSON per run) → `leaderboard` (static HTML from records + `models.json` + `board.json`) → `publish`. A held-out suite is identified **only by its name suffix** (`splits.is_heldout`). That suffix drives export (aggregates only) and publish (private repo only), so never rename it away. `load_suite` accepts `hf://<org>/<repo>/<dir>[@rev]` via `hub.fetch_suite`. Hub calls are isolated in `hub.py` (`_info`, `_api`) so tests can monkeypatch them; tests never touch the network.
+
 ## Ledger
 
 `examroom.sqlite` (gitignored) has a `runs` table with the backend and stats as JSON, a `results` table with one row per (run, item) holding score, protocol and detail JSON (including raw outputs), and a `metrics` table for run-level values such as calibration KL. There is also a `task_scores` view. `diff.py` does per-item comparison with exact McNemar tests and Wilson CIs. `selection.py` gates on the Wilson lower bound by default, using per-task minimums from `meta.acceptance` (task globs, last match wins).

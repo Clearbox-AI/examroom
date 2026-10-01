@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+from collections import Counter
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterator
@@ -197,6 +200,11 @@ def write_jsonl(path: Path, items: list[Item]) -> None:
 
 
 def load_suite(root: str | Path) -> Suite:
+    """Load a suite directory, or a Hub reference hf://<org>/<repo>/<suite dir>[@<revision>]."""
+    if str(root).startswith("hf://"):
+        from examroom.hub import fetch_suite
+
+        root = fetch_suite(str(root))
     root = Path(root)
     meta = SuiteMeta.model_validate_json((root / "suite.json").read_text())
     items: dict[str, list[Item]] = {}
@@ -220,3 +228,39 @@ def save_suite(root: str | Path, meta: SuiteMeta, items: dict[str, list[Item]]) 
     for t in meta.tasks:
         write_jsonl(root / t.file, items[t.name])
     return Suite(root, meta, items)
+
+
+def build_manifest(suite: Suite) -> dict:
+    """MANIFEST.json content: the content hash plus counts and provenance (no item text)."""
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        commit = None
+    return {
+        "suite": suite.name, "version": suite.version, "content_hash": suite.content_hash(),
+        "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"), "git_commit": commit,
+        "n_items": len(suite),
+        "meta": suite.meta.meta,
+        "files": {
+            t.file: {
+                "task": t.name, "kind": str(t.kind), "n_items": len(suite.items[t.name]),
+                "provenance": dict(Counter(f"{i.provenance.method}:{i.provenance.source}" for i in suite.items[t.name])),
+                "seeds": sorted({i.provenance.seed for i in suite.items[t.name] if i.provenance.seed is not None}),
+                "categories": dict(Counter(i.category for i in suite.items[t.name])),
+            } for t in suite.tasks
+        },
+    }
+
+
+def write_manifest(suite: Suite, force: bool = False) -> dict:
+    """Freeze a suite: write MANIFEST.json.  Refuses to re-freeze changed content in place."""
+    manifest = build_manifest(suite)
+    out = Path(suite.root) / "MANIFEST.json"
+    if out.exists() and not force:
+        old = json.loads(out.read_text())
+        if old.get("content_hash") != manifest["content_hash"]:
+            raise FileExistsError(
+                f"REFUSING: {out} exists with hash {old.get('content_hash')} != {manifest['content_hash']}.\n"
+                f"A frozen suite must not change in place — bump the version (new directory) or pass --force.")
+    out.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
