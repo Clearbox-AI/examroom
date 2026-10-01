@@ -65,7 +65,9 @@ def fmt_size(v, key: str = "n_params") -> str:
 # (tier, size field, inclusive maximum); weights in MiB, matching weights_mb
 TIERS = (
     ("tiny", "n_params", 1_000_000_000),
-    ("small", "n_params", 14_000_000_000),
+    # 15B, not 14B: totals count every stored tensor, so "14B" models with a vision
+    # encoder or MTP heads (Qwen3-14B: 14.8B) still count as small
+    ("small", "n_params", 15_000_000_000),
     ("local", "weights_mb", 128 * 1024),  # 128 GB unified memory: DGX Spark, Strix Halo
 )
 

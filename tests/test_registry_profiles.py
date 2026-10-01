@@ -27,8 +27,9 @@ def reg_with_models():
 
 def test_tiers_are_inclusive_and_overlap():
     assert tiers_for(1_000_000_000, 2 * GB) == ["tiny", "small", "local"]
-    assert tiers_for(14_000_000_000, 28 * GB) == ["small", "local"]
-    assert tiers_for(14_100_000_000, None) == []
+    assert tiers_for(14_800_000_000, 28 * GB) == ["small", "local"]   # a 14B-class model with extra heads
+    assert tiers_for(15_000_000_000, None) == ["small"]
+    assert tiers_for(15_100_000_000, None) == []
     assert tiers_for(80_000_000_000, 128 * GB) == ["local"]
     assert tiers_for(80_000_000_000, 128 * GB + 1) == []
 

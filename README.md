@@ -87,7 +87,7 @@ Leaderboard rows are (model, precision) pairs, grouped into overlapping tiers:
 | tier  | rule                                                                 |
 |-------|----------------------------------------------------------------------|
 | tiny  | total parameters ≤ 1B                                                |
-| small | total parameters ≤ 14B                                               |
+| small | total parameters ≤ 15B (so 14B-class models with extra heads fit)  |
 | local | weights at the run's precision ≤ 128 GB (DGX Spark, Strix Halo)      |
 
 The same 27B model is local at Q4 and at bf16; an 80B MoE only once quantised.

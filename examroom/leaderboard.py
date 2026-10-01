@@ -107,7 +107,9 @@ def _row_attrs(r) -> str:
 
 def render_board(data: dict) -> str:
     suites = data["suites"]
-    tier_rules = {"tiny": "≤ 1B parameters", "small": "≤ 14B parameters", "local": "weights ≤ 128 GB at the run's precision"}
+    tier_rules = {name: (f"≤ {fmt_size(limit)} parameters" if key == "n_params"
+                         else f"weights ≤ {limit / 1024:g} GB at the run's precision")
+                  for name, key, limit in TIERS}
     tabs, panels = [], []
     for vi, v in enumerate(data["views"]):
         pid = f"p{vi}"
