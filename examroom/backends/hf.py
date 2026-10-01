@@ -14,7 +14,7 @@ template: those probes are continuations written for raw text.
 
 from __future__ import annotations
 
-from examroom.backends.base import BackendInfo, Stats, Timer
+from examroom.backends.base import BackendInfo, Stats, Timer, strip_reasoning
 
 
 def generation_text(tok, prompt: str, use_chat: bool, template_kwargs: dict | None = None) -> tuple[str, bool]:
@@ -148,7 +148,7 @@ class HFBackend:
         texts = self.tok.batch_decode(new, skip_special_tokens=True)
         self.stats.tick(t.seconds, prompt_tokens=enc["input_ids"].shape[1], generated_tokens=int(new.numel()))
         self._update_mem()
-        return texts
+        return [strip_reasoning(x) for x in texts]
 
     def _update_mem(self):
         if self.device.startswith("cuda"):

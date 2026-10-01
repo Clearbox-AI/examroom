@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import time
 
-from examroom.backends.base import BackendInfo, Stats, Timer
+from examroom.backends.base import BackendInfo, Stats, Timer, strip_reasoning
 
 
 class OpenAICompatBackend:
@@ -22,17 +22,21 @@ class OpenAICompatBackend:
 
         self.model = model
         self.client = OpenAI(base_url=base_url, api_key=os.environ.get(api_key_env, "none"))
-        # reasoning: OpenRouter's unified knob for hybrid-thinking models
-        # ("off" disables it; "low"/"medium"/"high" set effort). Only sent when given,
-        # so plain OpenAI-compatible servers (llama.cpp, vLLM, …) are unaffected.
-        if reasoning == "off":
-            self.extra_body = {"reasoning": {"enabled": False}}
-        elif reasoning in ("low", "medium", "high"):
-            self.extra_body = {"reasoning": {"effort": reasoning}}
-        elif reasoning is None:
+        # reasoning=off|on switches thinking for hybrid models.  OpenRouter takes its own
+        # unified field (where low|medium|high also set effort); llama.cpp and vLLM servers
+        # take the chat template's enable_thinking flag.  Nothing is sent when not given.
+        on_openrouter = "openrouter.ai" in (base_url or "")
+        if reasoning is None:
             self.extra_body = None
+        elif on_openrouter and reasoning in ("off", "on"):
+            self.extra_body = {"reasoning": {"enabled": reasoning == "on"}}
+        elif on_openrouter and reasoning in ("low", "medium", "high"):
+            self.extra_body = {"reasoning": {"effort": reasoning}}
+        elif base_url and not on_openrouter and reasoning in ("off", "on"):
+            self.extra_body = {"chat_template_kwargs": {"enable_thinking": reasoning == "on"}}
         else:
-            raise ValueError("reasoning must be off|low|medium|high")
+            raise ValueError(f"reasoning={reasoning!r} is not supported for base_url={base_url!r} "
+                             "(off|on for local servers and OpenRouter; low|medium|high on OpenRouter)")
         self.info = BackendInfo(backend="openai", model=model,
                                 extra={"base_url": base_url, "reasoning": reasoning})
         self.stats = Stats()
@@ -62,7 +66,7 @@ class OpenAICompatBackend:
             prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
             generated_tokens=getattr(usage, "completion_tokens", 0) or 0,
         )
-        return [(c.message.content or "") for c in resp.choices]
+        return [strip_reasoning(c.message.content or "") for c in resp.choices]
 
     def close(self):
         pass

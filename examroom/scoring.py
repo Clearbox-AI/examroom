@@ -108,6 +108,8 @@ def _sampled(item: Item, task: Task, backend: Backend, prompt: str, judge) -> tu
     """
     temperature = task.scoring.get("temperature", 0.0 if item.samples == 1 else 0.7)
     max_tokens = task.scoring.get("max_tokens", item.max_tokens)
+    # min_max_tokens (set by a run profile): a floor, so thinking runs get room to answer
+    max_tokens = max(max_tokens, task.scoring.get("min_max_tokens", 0))
     instruction = task.scoring.get("instruction")
     if instruction:  # run-time suffix for chat models that need "answer only" steering
         prompt = f"{prompt}\n\n{instruction}"

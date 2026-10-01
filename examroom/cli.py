@@ -106,21 +106,45 @@ def cmd_run(a):
         if not mf.exists() or json.loads(mf.read_text()).get("content_hash") != suite.content_hash():
             print("suite is not frozen or has changed since freeze; run `examroom freeze` or pass --allow-unfrozen")
             return 1
+    from examroom.profiles import PROFILE_FIXED_OPTIONS, get_profile
     from examroom.selection import SIZE_KEYS, parse_size
 
-    kw, size = {}, {}
+    kw, size, model_id = {}, {}, None
     for kv in a.opt or []:
         k, v = kv.split("=", 1)
         if k in SIZE_KEYS:  # model metadata for `examroom select`, not a backend option
             size[k] = parse_size(k, v)
+        elif k == "model_id":  # registry id, when the backend's model name is not one of its aliases
+            model_id = v
         else:
             kw[k] = int(v) if v.isdigit() else v
+    overrides = {k: v for k, v in {"max_tokens": a.max_tokens, "instruction": a.instruction}.items() if v}
+    profile = None
+    if a.profile:
+        try:
+            profile = get_profile(a.profile)
+        except KeyError as e:
+            print(e.args[0])
+            return 1
+        clash = sorted((PROFILE_FIXED_OPTIONS & kw.keys()) | overrides.keys())
+        if not a.dry_run:  # a ranked run covers the whole suite
+            clash += [f"--{k}" for k in ("limit", "task") if getattr(a, k)]
+        if clash:
+            print(f"profile {profile.id} fixes {', '.join(clash)}; drop them, or drop --profile for an "
+                  f"exploratory run (unprofiled runs are not ranked)")
+            return 1
+        kw.update(profile.backend_options(a.backend.split(":", 1)[0]))
+        overrides = profile.overrides()
     backend = load_backend(a.backend, **kw)
     for k, v in size.items():  # explicit values win over what the backend measured
         setattr(backend.info, k, v)
     if backend.info.quantization is None and isinstance(kw.get("quantization"), str):
         backend.info.quantization = kw["quantization"]  # e.g. the GGUF quant behind an openai: server
-    overrides = {k: v for k, v in {"max_tokens": a.max_tokens, "instruction": a.instruction}.items() if v}
+    if model_id:
+        backend.info.extra["model_id"] = model_id
+    if profile:
+        backend.info.extra["profile"] = profile.id
+        backend.info.extra["profile_spec"] = profile.as_dict()
     overrides = overrides or None
 
     def progress(i, n, r):
@@ -134,7 +158,7 @@ def cmd_run(a):
     if not a.dry_run:
         Ledger(a.ledger).record(run)
     print(f"run {run.run_id}  {run.backend['backend']}:{run.backend['model']}  suite={run.suite}@{run.suite_version} "
-          f"hash={run.suite_hash}")
+          f"hash={run.suite_hash}  profile={run.backend.get('profile') or '- (unranked)'}")
     for t, (s, n) in run.task_scores().items():
         print(f"  {t:20s} {s:.3f}  (n={n})")
     print(f"  {'TOTAL':20s} {run.score:.3f}  (n={len(run.results)})")
@@ -162,11 +186,12 @@ def cmd_runs(a):
 
     rows = Ledger(a.ledger).runs(suite=a.suite, model=a.model)
     print(f"{'run_id':12s} {'ts':20s} {'suite':14s} {'hash':10s} {'model':40s} {'params':6s} {'quant':6s} "
-          f"{'score':6s} {'n':5s} label")
+          f"{'profile':10s} {'score':6s} {'n':5s} label")
     for r in rows:
+        prof = json.loads(r["backend_json"]).get("profile") or "-"
         print(f"{r['run_id']:12s} {r['ts'][:19]:20s} {r['suite'] + '@' + r['suite_version']:14s} {r['suite_hash'][:8]:10s} "
-              f"{r['model'][:40]:40s} {fmt_size(r['n_params']):6s} {(r['quantization'] or '-'):6s} {r['score']:.3f}  "
-              f"{r['n_items']:<5d}{r['label'] or ''}")
+              f"{r['model'][:40]:40s} {fmt_size(r['n_params']):6s} {(r['quantization'] or '-'):6s} {prof:10s} "
+              f"{r['score']:.3f}  {r['n_items']:<5d}{r['label'] or ''}")
     return 0
 
 
@@ -213,9 +238,70 @@ def cmd_select(a):
     if bad := [p for p, v in criteria if not 0 <= v <= 1]:
         print(f"acceptance minimums must be in [0, 1]: {bad}")
         return 1
-    sel = select(Ledger(a.ledger), suite, criteria, gate=a.gate, size_key=a.size)
+    from examroom.registry import Registry
+
+    try:
+        sel = select(Ledger(a.ledger), suite, criteria, gate=a.gate, size_key=a.size,
+                     registry=Registry.load(a.registry), tier=a.tier, profile=a.profile)
+    except KeyError as e:
+        print(e.args[0])
+        return 1
     print(render(sel))
     return 1 if sel.gated and not any(c.passed for c in sel.candidates) else 0
+
+
+def cmd_profiles(a):
+    from examroom.profiles import PROFILES
+
+    for p in PROFILES.values():
+        print(f"{p.id:12s} reasoning={p.reasoning:3s}  temperature={p.temperature if p.temperature is not None else 'suite'!s:5s}  "
+              f"min_max_tokens={p.min_max_tokens or '-':<6}  {p.description}")
+    return 0
+
+
+def cmd_models_list(a):
+    from examroom.registry import Registry, fmt_size, tiers_for
+
+    reg = Registry.load(a.registry)
+    if not reg.models:
+        print(f"no models in {a.registry}; add one with `examroom models add`")
+        return 0
+    for mid, e in sorted(reg.models.items()):
+        print(f"{mid}  params={fmt_size(e.get('n_params'))}  active={fmt_size(e.get('active_params'))}"
+              + (f"  aliases={','.join(e['aliases'])}" if e.get("aliases") else ""))
+        for prec, q in sorted(e.get("quants", {}).items()):
+            tiers = tiers_for(e.get("n_params"), q.get("weights_mb"))
+            print(f"    {prec:10s} {fmt_size(q.get('weights_mb'), 'weights_mb'):>8s}  tiers={','.join(tiers) or '-'}"
+                  + (f"  {q['file']}" if q.get("file") else ""))
+    return 0
+
+
+def cmd_models_add(a):
+    from examroom.registry import Registry, fmt_size
+
+    reg = Registry.load(a.registry)
+    try:
+        e = reg.add(a.model_id, a.params, a.active, a.alias, a.source)
+    except ValueError as err:
+        print(err)
+        return 1
+    reg.save()
+    print(f"{a.model_id}: params={fmt_size(e['n_params'])} active={fmt_size(e['active_params'])} -> {a.registry}")
+    return 0
+
+
+def cmd_models_quant(a):
+    from examroom.registry import Registry, fmt_size
+
+    reg = Registry.load(a.registry)
+    try:
+        q = reg.add_quant(a.model_id, a.precision, weights_mb=a.weights_mb, file=a.file)
+    except (KeyError, ValueError) as err:
+        print(err.args[0])
+        return 1
+    reg.save()
+    print(f"{a.model_id} {a.precision}: {fmt_size(q['weights_mb'], 'weights_mb')} -> {a.registry}")
+    return 0
 
 
 def cmd_diff(a):
@@ -341,11 +427,14 @@ def main(argv=None):
     p = sub.add_parser("run", help="evaluate a model on a suite and record to the ledger")
     p.add_argument("suite"); p.add_argument("backend", help="hf:<model> | openai:<model> | dummy:uniform")
     p.add_argument("--opt", action="append", metavar="KEY=VAL", help="backend option (dtype=bf16, quantization=4bit, base_url=…, batch_size=8); "
-                   "n_params=4B, active_params=3B, weights_mb=2500 record model size for `select`")
+                   "n_params=4B, active_params=3B, weights_mb=2500 record model size for `select`; "
+                   "model_id=<registry id> when the backend's model name is not a registry alias")
     p.add_argument("--task", action="append"); p.add_argument("--limit", type=int)
     p.add_argument("--max-tokens", type=int, help="override generation budget for every task")
     p.add_argument("--instruction", help="append an instruction to every generative prompt "
                    "(chat models: e.g. 'Answer with only the number.'); recorded in run metadata")
+    p.add_argument("--profile", help="run profile (nothink | think): the fixed protocol leaderboard runs are "
+                   "ranked under; see `examroom profiles`")
     p.add_argument("--label"); p.add_argument("--ledger", default="examroom.sqlite")
     p.add_argument("--workers", type=int, default=1,
                    help="score items concurrently (API backends; hf runs stay sequential)")
@@ -372,7 +461,32 @@ def main(argv=None):
                    help="compare the minimum with the 95%% Wilson lower bound (default) or the raw score")
     p.add_argument("--size", choices=["n_params", "active_params", "weights_mb"], default="n_params",
                    help="what 'smallest' means")
+    p.add_argument("--tier", choices=["tiny", "small", "local"], help="only runs of models in this tier")
+    p.add_argument("--profile", help="only runs under this profile (a bare name means its current version)")
+    p.add_argument("--registry", default="models.json", help="model registry: sizes and tiers")
     p.add_argument("--ledger", default="examroom.sqlite"); p.set_defaults(fn=cmd_select)
+
+    p = sub.add_parser("profiles", help="list run profiles")
+    p.set_defaults(fn=cmd_profiles)
+
+    p = sub.add_parser("models", help="model registry: sizes and tiers for the leaderboard")
+    p.add_argument("--registry", default="models.json")
+    msub = p.add_subparsers(dest="models_cmd", required=True)
+    q = msub.add_parser("list", help="registered models, quantisations and tiers"); q.set_defaults(fn=cmd_models_list)
+    q = msub.add_parser("add", help="register a model (or update its parameter counts and aliases)")
+    q.add_argument("model_id", help="canonical id, e.g. Qwen/Qwen3-30B-A3B")
+    q.add_argument("--params", required=True, help="total parameters, e.g. 30.5B")
+    q.add_argument("--active", help="active parameters per token (MoE), e.g. 3.3B")
+    q.add_argument("--alias", action="append", default=[],
+                   help="other names runs use for it: OpenRouter id, Ollama tag, local path")
+    q.add_argument("--source", help="where the counts come from, e.g. 'config.json' or a model card URL")
+    q.set_defaults(fn=cmd_models_add)
+    q = msub.add_parser("quant", help="record the weight footprint of one precision of a model")
+    q.add_argument("model_id"); q.add_argument("precision", help="bf16 | fp8 | Q4_K_M | Q8_0 | 4bit …")
+    g = q.add_mutually_exclusive_group(required=True)
+    g.add_argument("--weights-mb", type=float, help="footprint in MiB")
+    g.add_argument("--file", help="weights file (e.g. a GGUF): size and sha256 are recorded")
+    q.set_defaults(fn=cmd_models_quant)
 
     p = sub.add_parser("diff", help="compare two runs item by item")
     p.add_argument("run_a"); p.add_argument("run_b"); p.add_argument("--items", action="store_true")

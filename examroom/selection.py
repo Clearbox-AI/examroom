@@ -14,46 +14,17 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import re
 from dataclasses import dataclass, field
 
 from examroom.diff import wilson
 from examroom.items import Suite
 from examroom.ledger import Ledger
+from examroom.profiles import get_profile
+from examroom.registry import SIZE_KEYS, TIERS, Registry, fmt_size, parse_count, parse_size  # noqa: F401 (re-exported)
 
-SIZE_KEYS = ("n_params", "active_params", "weights_mb")
 Z = 1.96
+TIER_NAMES = [t[0] for t in TIERS]
 _EPS = 1e-9  # means of 0/1 scores are floats: 0.9 must clear a 0.9 gate
-
-_COUNT = re.compile(r"^\s*(\d*\.?\d+(?:e[+-]?\d+)?)\s*([kmbt]?)\s*$", re.I)
-_MULT = {"": 1, "k": 1e3, "m": 1e6, "b": 1e9, "t": 1e12}
-
-
-def parse_count(s) -> int:
-    """'4B' -> 4_000_000_000; also '600M', '30.5b', '1.2e9', '4000'."""
-    m = _COUNT.match(str(s))
-    if not m:
-        raise ValueError(f"not a parameter count: {s!r} (use e.g. 4B, 600M, 1.2e9)")
-    return int(round(float(m.group(1)) * _MULT[m.group(2).lower()]))
-
-
-def parse_size(key: str, value) -> int | float:
-    if key == "weights_mb":
-        return float(value)
-    if key in ("n_params", "active_params"):
-        return parse_count(value)
-    raise ValueError(f"unknown size key {key!r}; expected one of {', '.join(SIZE_KEYS)}")
-
-
-def fmt_size(v, key: str = "n_params") -> str:
-    if v is None:
-        return "?"
-    if key == "weights_mb":
-        return f"{v / 1024:.1f}GB" if v >= 1024 else f"{v:.0f}MB"
-    for unit, d in (("T", 1e12), ("B", 1e9), ("M", 1e6), ("K", 1e3)):
-        if v >= d:
-            return f"{v / d:.3g}{unit}"
-    return str(v)
 
 
 def minimum_for(task: str, criteria: list[tuple[str, float]]) -> float | None:
@@ -86,6 +57,9 @@ class Candidate:
     size: float | None
     cells: dict[str, Cell]
     passed: bool | None   # None when nothing is gated
+    size_source: str | None = None   # registry | run | estimate
+    tiers: list[str] = field(default_factory=list)
+    profile: str | None = None
 
 
 @dataclass
@@ -99,6 +73,9 @@ class Selection:
     minimums: dict[str, float | None]
     candidates: list[Candidate]          # smallest first, unknown sizes last
     skipped_runs: int = 0                # same suite name, different content hash
+    filtered_runs: int = 0               # outside the requested tier or profile
+    tier: str | None = None
+    profile: str | None = None
     unmatched_patterns: list[str] = field(default_factory=list)
     unreachable: list[tuple[str, int, float, float]] = field(default_factory=list)  # task, n, max lower, min
 
@@ -112,7 +89,10 @@ class Selection:
 
 
 def select(ledger: Ledger, suite: Suite, criteria: list[tuple[str, float]],
-           gate: str = "lower", size_key: str = "n_params") -> Selection:
+           gate: str = "lower", size_key: str = "n_params", registry: Registry | None = None,
+           tier: str | None = None, profile: str | None = None) -> Selection:
+    """`registry` supplies model sizes at read time (registry facts beat what a run
+    recorded); `tier` and `profile` restrict the candidates, as a leaderboard column does."""
     if gate not in ("lower", "point"):
         raise ValueError("gate must be 'lower' or 'point'")
     if size_key not in SIZE_KEYS:
@@ -120,7 +100,12 @@ def select(ledger: Ledger, suite: Suite, criteria: list[tuple[str, float]],
     h = suite.content_hash()
     tasks = [t.name for t in suite.tasks]
     minimums = {t: minimum_for(t, criteria) for t in tasks}
-    sel = Selection(suite.name, suite.version, h, size_key, gate, tasks, minimums, [],
+    registry = registry or Registry()
+    if tier is not None and tier not in TIER_NAMES:
+        raise ValueError(f"tier must be one of {', '.join(TIER_NAMES)}")
+    # a bare name means the current version: runs under an older version are not comparable
+    want_profile = profile if not profile or "@" in profile else get_profile(profile).id
+    sel = Selection(suite.name, suite.version, h, size_key, gate, tasks, minimums, [], tier=tier, profile=profile,
                     unmatched_patterns=[p for p, _ in criteria if not any(fnmatch.fnmatchcase(t, p) for t in tasks)])
     if gate == "lower":
         for t in tasks:
@@ -131,6 +116,12 @@ def select(ledger: Ledger, suite: Suite, criteria: list[tuple[str, float]],
     for row in ledger.runs(suite=suite.name):
         if row["suite_hash"] != h:
             sel.skipped_runs += 1
+            continue
+        backend = json.loads(row["backend_json"])
+        ms = registry.size(backend)
+        run_profile = backend.get("profile")
+        if (tier and tier not in ms.tiers) or (want_profile and run_profile != want_profile):
+            sel.filtered_runs += 1
             continue
         scores = ledger.task_scores(row["run_id"])
         cells = {}
@@ -143,18 +134,27 @@ def select(ledger: Ledger, suite: Suite, criteria: list[tuple[str, float]],
             ok = None if minimums[t] is None else (lo if gate == "lower" else s) + _EPS >= minimums[t]
             cells[t] = Cell(s, n, lo, ok)
         gates = [c.ok for c in cells.values() if c.ok is not None]
-        size = json.loads(row["backend_json"]).get(size_key)
-        sel.candidates.append(Candidate(row["run_id"], row["model"], row["label"], row["quantization"],
-                                        size, cells, all(gates) if gates else None))
+        sel.candidates.append(Candidate(row["run_id"], row["model"], row["label"], ms.precision,
+                                        getattr(ms, size_key), cells, all(gates) if gates else None,
+                                        ms.weights_source if size_key == "weights_mb" else None,
+                                        ms.tiers, run_profile))
     sel.candidates.sort(key=lambda c: (c.size is None, c.size or 0,
                                        -sum(x.score or 0 for x in c.cells.values())))
     return sel
+
+
+def _size(c: Candidate, key: str) -> str:
+    return fmt_size(c.size, key) + ("~" if c.size_source == "estimate" else "")
 
 
 def render(sel: Selection) -> str:
     what = "95% Wilson lower bound" if sel.gate == "lower" else "score"
     out = [f"{sel.suite}@{sel.version}  hash {sel.suite_hash[:8]}  {len(sel.candidates)} runs  "
            f"gate: {what} >= min  size: {sel.size_key}"]
+    if sel.tier or sel.profile:
+        out.append("restricted to " + "  ".join(x for x in (sel.tier and f"tier={sel.tier}",
+                                                         sel.profile and f"profile={sel.profile}") if x)
+                   + f"  ({sel.filtered_runs} other runs left out)")
     if sel.skipped_runs:
         out.append(f"({sel.skipped_runs} runs of other {sel.suite} content skipped: different suite hash)")
     if not sel.candidates:
@@ -175,11 +175,12 @@ def render(sel: Selection) -> str:
     if sel.gated:
         out.append(f"{'verdict':{tw}s}  {'':>5s} {'':>4s} "
                    + "".join(f"{'PASS' if c.passed else 'fail':>6s} " for c in cols))
-    out.append(f"{'size':{tw}s}  {'':>5s} {'':>4s} " + "".join(f"{fmt_size(c.size, sel.size_key):>6s} " for c in cols))
+    out.append(f"{'size':{tw}s}  {'':>5s} {'':>4s} " + "".join(f"{_size(c, sel.size_key):>6s} " for c in cols))
     out.append("")
     for i, c in enumerate(cols, 1):
-        extra = "  ".join(x for x in (c.label, c.quantization and f"quant={c.quantization}") if x)
-        out.append(f"[{i}] {c.run_id}  {c.model}  {sel.size_key}={fmt_size(c.size, sel.size_key)}  {extra}".rstrip())
+        extra = "  ".join(x for x in (c.label, c.quantization and f"precision={c.quantization}",
+                                      c.tiers and "tiers=" + ",".join(c.tiers), c.profile and f"profile={c.profile}") if x)
+        out.append(f"[{i}] {c.run_id}  {c.model}  {sel.size_key}={_size(c, sel.size_key)}  {extra}".rstrip())
     out.append("")
     for p in sel.unmatched_patterns:
         out.append(f"! pattern {p!r} matches no task of this suite")
@@ -190,11 +191,13 @@ def render(sel: Selection) -> str:
         out.append("no acceptance criteria: add meta.acceptance to suite.json or pass --min TASK_GLOB=MIN")
     elif sel.best:
         b = sel.best
-        out.append(f"smallest passing: [{cols.index(b) + 1}] {b.model}  {sel.size_key}={fmt_size(b.size, sel.size_key)}"
+        out.append(f"smallest passing: [{cols.index(b) + 1}] {b.model}  {sel.size_key}={_size(b, sel.size_key)}"
                    f"  (run {b.run_id})")
     else:
         unsized = [cols.index(c) + 1 for c in cols if c.passed]
         out.append("no run passes every gate" if not unsized else
-                   f"passing runs have no recorded {sel.size_key}: {unsized}; "
-                   f"set it with `examroom annotate <run_id> {sel.size_key}=…`")
+                   f"passing runs have no known {sel.size_key}: {unsized}; register the model "
+                   f"(`examroom models add`) or `examroom annotate <run_id> {sel.size_key}=…`")
+    if any(c.size_source == "estimate" for c in cols):
+        out.append("~ weights estimated from parameters and precision (8 bits/weight when the precision is unknown)")
     return "\n".join(out)

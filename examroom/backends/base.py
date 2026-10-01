@@ -85,6 +85,21 @@ class Backend(Protocol):
     def close(self) -> None: ...
 
 
+def strip_reasoning(text: str) -> str:
+    """The answer part of a generation from a thinking model.
+
+    Servers without a reasoning parser (and raw hf generation) return the thought
+    inline as `<think>…</think>answer`; some templates open the block in the prompt,
+    so only the closing tag appears.  A thought cut off by the token budget has no
+    answer at all, which must score as a failure rather than parse numbers out of
+    the reasoning."""
+    if "</think>" in text:
+        return text.rsplit("</think>", 1)[1].lstrip()
+    if text.lstrip().startswith("<think>"):
+        return ""
+    return text
+
+
 class Timer:
     def __enter__(self):
         self.t0 = time.perf_counter()

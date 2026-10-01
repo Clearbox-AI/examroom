@@ -80,6 +80,51 @@ clears the minimum (`--gate point` compares the raw score instead), so small tas
 can't pass on luck: 12/12 only demonstrates 0.76, and `select` flags gates that a
 task is too small to ever clear.
 
+## Leaderboard: tiers, model registry, run profiles
+
+Leaderboard rows are (model, precision) pairs, grouped into overlapping tiers:
+
+| tier  | rule                                                                 |
+|-------|----------------------------------------------------------------------|
+| tiny  | total parameters ≤ 1B                                                |
+| small | total parameters ≤ 14B                                               |
+| local | weights at the run's precision ≤ 128 GB (DGX Spark, Strix Halo)      |
+
+The same 27B model is local at Q4 and at bf16; an 80B MoE only once quantised.
+Active parameters (MoE) are shown alongside but do not define a tier.
+
+Sizes come from a **model registry** (`models.json`), not from runs: an API run
+can measure nothing, and correcting an entry re-tiers every past run of that
+model. Runs match an entry by id or alias (or `--opt model_id=…`). When the
+registry has no footprint for the precision a run used, it is estimated from the
+parameter count (8 bits/weight when a hosted API does not state its precision)
+and marked `~`.
+
+```bash
+examroom models add Qwen/Qwen3-30B-A3B --params 30.5B --active 3.3B \
+    --alias qwen/qwen3-30b-a3b --source "config.json"
+examroom models quant Qwen/Qwen3-30B-A3B Q4_K_M --file Qwen3-30B-A3B-Q4_K_M.gguf   # size + sha256
+examroom models list
+```
+
+A **run profile** fixes how the model is driven, so runs are comparable: only runs
+sharing a profile are ranked together. `examroom profiles` lists them:
+`nothink@1` (reasoning off, the suite's budgets) and `think@1` (reasoning on,
+temperature 0.6, at least 16k tokens per answer). A profiled run refuses
+`--max-tokens`, `--instruction`, reasoning options and partial runs (`--limit`,
+`--task`, except with `--dry-run`); anything a suite needs to be
+answerable by a chat model belongs in its task `scoring.instruction`, which is
+hashed. The profile switches reasoning in each backend's vocabulary (hf chat
+template, Anthropic `thinking`, OpenRouter `reasoning`, `chat_template_kwargs`
+for llama.cpp / vLLM servers), and inline `<think>…</think>` blocks are stripped
+before scoring; a thought cut off by the budget scores as no answer.
+
+```bash
+examroom run suites/crc_pilot_v0.4 openai:qwen/qwen3-30b-a3b --profile nothink \
+    --opt base_url=https://openrouter.ai/api/v1 --opt api_key_env=OPENROUTER_API_KEY
+examroom select suites/crc_pilot_v0.4 --tier local --profile nothink --size weights_mb
+```
+
 ## Suites
 
 * `suites/world_model_v1/` — Track 1 of the tiny-model capability brief: 1223
@@ -123,12 +168,13 @@ Programmatic authoring: `examroom.authoring.templates.Builder` — see
 examroom/
   items.py        Item / Task / Suite, JSONL IO, content hash
   scoring.py      one scorer per kind, protocol fallback
-  checks/         program checkers: schedules (T1–T3), calibration (T4), dialogue (qualitative)
-  backends/       hf (transformers), openai_compat, dummy
+  backends/       hf (transformers), anthropic_api, openai_compat, dummy
   runner.py       run a suite, collect per-item results + resource stats
   ledger.py       SQLite: runs, results, item history
   diff.py         run-vs-run comparison, Wilson CI, exact McNemar
   selection.py    per-task acceptance gates, smallest passing model
+  registry.py     model registry: parameter counts, weight footprints, tiers
+  profiles.py     run profiles (nothink, think): the protocol runs are ranked under
   validate.py     schema, dedup, balance, conventions (+ leakage via --corpus)
   leakage.py      streaming n-gram / exact-document overlap vs training shards
   authoring/      template Builder with rebalancing
