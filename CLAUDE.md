@@ -46,6 +46,8 @@ Data flow: `items.load_suite` → `backends.load_backend("<type>:<model>")` → 
 
 Suites → `split` (public + `<name>-heldout`, both frozen) → `run --profile` → `export` (JSON per run) → `leaderboard` (static HTML from records + `models.json` + `board.json`) → `publish`. A held-out suite is identified **only by its name suffix** (`splits.is_heldout`). That suffix drives export (aggregates only) and publish (private repo only), so never rename it away. `load_suite` accepts `hf://<org>/<repo>/<dir>[@rev]` via `hub.fetch_suite`. Hub calls are isolated in `hub.py` (`_info`, `_api`) so tests can monkeypatch them; tests never touch the network.
 
+This GitHub repo is public, so a released templated suite must not be reproducible from it. Generate a release with a secret `--seed` (it is not written into the items), keep the full suite and the held-out half in the gitignored `private/` dir, and store the seed only in the private held-out Hub repo (`GENERATOR.json`). Only the public half goes under `suites/`. `crc_clinician_v1.0` was released this way; its v0.1 draft uses the public seed. The ranked suites and profiles are pinned in the committed `board.json`; `results/` (exported records) is gitignored and lives in the results repo.
+
 ## Ledger
 
 `examroom.sqlite` (gitignored) has a `runs` table with the backend and stats as JSON, a `results` table with one row per (run, item) holding score, protocol and detail JSON (including raw outputs), and a `metrics` table for run-level values such as calibration KL. There is also a `task_scores` view. `diff.py` does per-item comparison with exact McNemar tests and Wilson CIs. `selection.py` gates on the Wilson lower bound by default, using per-task minimums from `meta.acceptance` (task globs, last match wins).

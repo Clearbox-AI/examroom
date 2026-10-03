@@ -193,6 +193,9 @@ def test_hub_weight_files_and_facts(monkeypatch, tmp_path, capsys):
     assert [s.rfilename for s in hub.weight_files(two, "*q8_0*")] == ["m_q8_0.gguf"]
 
     shards = [_Sib("model-00001.safetensors", 2**30), _Sib("model-00002.safetensors", 2**30), _Sib("x.json", 1)]
+    mistral = shards + [_Sib("consolidated.safetensors", 2 * 2**30)]                # same weights, other format
+    assert [s.rfilename for s in hub.weight_files(mistral)] == ["model-00001.safetensors", "model-00002.safetensors"]
+    assert [s.rfilename for s in hub.weight_files([mistral[-1]])] == ["consolidated.safetensors"]
     st = type("S", (), {"total": 1_100_000_000, "parameters": {"BF16": 1_099_999_990, "I64": 10}})()
     infos = {"org/m": type("I", (), {"sha": "abc123", "siblings": shards, "safetensors": st})(),
              "org/m-gguf": type("I", (), {"sha": "def456", "siblings": gguf, "safetensors": None})()}

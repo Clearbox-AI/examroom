@@ -28,7 +28,7 @@ def _info(repo: str):
 
 def weight_files(siblings, match: str | None = None) -> list:
     """The files holding one precision's weights: a single GGUF (optionally chosen by
-    glob), else every safetensors shard."""
+    glob), else every safetensors shard (a duplicate consolidated.safetensors excluded)."""
     names = [s for s in siblings if s.rfilename.endswith((".gguf", ".safetensors"))
              and "mmproj" not in s.rfilename.lower()]
     if match:
@@ -41,7 +41,10 @@ def weight_files(siblings, match: str | None = None) -> list:
         return ggufs
     if not names:
         raise ValueError("no weight files (.safetensors / .gguf) found" + (f" matching {match!r}" if match else ""))
-    return names
+    # Mistral repos ship the same weights twice: consolidated.safetensors (mistral-inference
+    # format) next to the transformers shards. Count one copy.
+    shards = [s for s in names if not s.rfilename.split("/")[-1].startswith("consolidated")]
+    return shards or names
 
 
 def quant_facts(repo: str, match: str | None = None) -> dict:
