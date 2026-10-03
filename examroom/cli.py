@@ -619,7 +619,7 @@ def main(argv=None):
     p.add_argument("what", choices=["suite", "results", "page"])
     p.add_argument("path", help="suite directory | exported results directory | leaderboard.html")
     p.add_argument("--repo", required=True, help="dataset repo (suite, results) or static Space (page), "
-                                                 "e.g. Clearbox-AI/examroom-suites")
+                                                 "e.g. clearbox-ai/examroom-suites")
     p.add_argument("--registry", help="results: also upload this registry as models.json")
     p.add_argument("--board", help="results: also upload this board file as board.json")
     p.set_defaults(fn=cmd_publish)

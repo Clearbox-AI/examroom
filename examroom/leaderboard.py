@@ -6,7 +6,7 @@ held-out splits) and which run profiles are ranked.
     {"title": "examroom leaderboard",
      "profiles": ["nothink@1", "think@1"],
      "suites": [{"name": "crc_pilot-heldout", "version": "0.4", "hash": "443225e6a82424c0",
-                 "label": "CRC pilot", "public": "hf://Clearbox-AI/examroom-suites/crc_pilot_v0.4"}]}
+                 "label": "CRC pilot", "public": "hf://clearbox-ai/examroom-suites/crc_pilot_v0.4"}]}
 
 A row is a (model, precision) pair; when several runs exist for a row, suite and
 profile, the latest counts.  A suite score is the mean of its task scores (each

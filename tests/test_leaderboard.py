@@ -115,8 +115,8 @@ def test_board_latest_run_wins_and_overall_needs_every_suite(tmp_path):
 def test_hf_suite_ref(monkeypatch, tmp_path):
     import examroom.hub as hub
 
-    assert hub.parse_suite_ref("hf://Clearbox-AI/examroom-suites/crc_v1@abc") == \
-        ("Clearbox-AI/examroom-suites", "crc_v1", "abc")
+    assert hub.parse_suite_ref("hf://clearbox-ai/examroom-suites/crc_v1@abc") == \
+        ("clearbox-ai/examroom-suites", "crc_v1", "abc")
     assert hub.parse_suite_ref("hf://org/repo/a/b") == ("org/repo", "a/b", None)
     with pytest.raises(ValueError):
         hub.parse_suite_ref("hf://org/repo")

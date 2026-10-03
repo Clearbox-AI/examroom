@@ -144,7 +144,7 @@ engine. Any command that takes a suite also takes a Hub reference, downloaded
 and cached; pin a revision, since a suite's `checker.py` runs when it is scored:
 
 ```bash
-examroom run hf://Clearbox-AI/examroom-suites/crc_pilot_v0.4@<rev> openai:… --profile nothink
+examroom run hf://clearbox-ai/examroom-suites/crc_pilot_v0.4@<rev> openai:… --profile nothink
 ```
 
 The leaderboard ranks on **held-out** items. `split` divides a frozen suite into
@@ -157,8 +157,8 @@ same side, e.g. translations. The public half carries the held-out
 ```bash
 examroom split suites/crc_pilot_v0.4 --public out/crc_pilot_v0.4 \
     --heldout private/crc_pilot_v0.4 --group-id='-(en|it)-'
-examroom publish suite out/crc_pilot_v0.4 --repo Clearbox-AI/examroom-suites
-examroom publish suite private/crc_pilot_v0.4 --repo Clearbox-AI/examroom-suites-heldout  # must be private
+examroom publish suite out/crc_pilot_v0.4 --repo clearbox-ai/examroom-suites
+examroom publish suite private/crc_pilot_v0.4 --repo clearbox-ai/examroom-suites-heldout  # must be private
 ```
 
 Runs travel as JSON records: `export` writes `<suite>@<version>/<run_id>.json`.
@@ -169,8 +169,8 @@ suites by exact hash and the profiles:
 ```bash
 examroom export --profiled --out results/
 examroom leaderboard results/ --board board.json --registry models.json --out leaderboard.html
-examroom publish results results/ --repo Clearbox-AI/examroom-results --registry models.json --board board.json
-examroom publish page leaderboard.html --repo Clearbox-AI/examroom-leaderboard   # a static Space
+examroom publish results results/ --repo clearbox-ai/examroom-results --registry models.json --board board.json
+examroom publish page leaderboard.html --repo clearbox-ai/examroom-leaderboard   # a static Space
 ```
 
 `publish` never creates repos, refuses to put a held-out suite in a public repo,
