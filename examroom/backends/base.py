@@ -82,6 +82,11 @@ class Backend(Protocol):
     def generate(self, prompt: str, max_tokens: int, temperature: float, n: int) -> list[str]:
         ...
 
+    # optional, for `agent` items (backends that set supports_tools = True):
+    # def chat(self, messages: list[dict], tools: list[dict], max_tokens: int, temperature: float) -> dict
+    #   messages in OpenAI chat format, tools MCP-style {"name", "description", "inputSchema"};
+    #   returns {"content": str, "tool_calls": [{"id", "name", "arguments": JSON string}]}
+
     def close(self) -> None: ...
 
 

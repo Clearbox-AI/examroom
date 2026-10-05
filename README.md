@@ -11,7 +11,8 @@ generator. examroom is built around three things:
 1. **An item format where the scoring kind is the primary axis.** Likelihood
    probes (`choice_loglik`, `pair_loglik`) for small models and anything
    factual; programmatic checks (`exact`, `regex`, `numeric`, `program`) for
-   generation; `choice_generate` as the fallback for chat-only APIs.
+   generation; `choice_generate` as the fallback for chat-only APIs; `agent`
+   for tool-calling episodes against a mock API shipped with the suite.
 2. **A per-item results ledger** (SQLite): model, dtype, quantisation, device,
    peak memory, tokens/s, git commit, suite content hash — and every item's
    score, so `diff` tells you *which* questions flipped, with a McNemar p-value
@@ -216,6 +217,15 @@ A suite is a directory with `suite.json` and one JSONL per task:
 One item is a valid suite — that is the point. For generated answers use
 `"kind": "numeric", "target": "42", "tolerance": 0.5` or
 `"kind": "program", "checker": "mypkg.checks:valid_schedule"`.
+
+For tool use, an `agent` item adds `"env": "./mock_api.py"` (a suite-local module
+with MCP-style `TOOLS` and `call(name, arguments, fixture)`) and a `fixture` (the
+world that item's tools answer from). The runner drives the model through native
+tool calling (`openai:`, `anthropic:`) until it answers without a tool call or runs
+out of turns (task `scoring.max_turns`, default 8; `scoring.system` sets a system
+prompt). The checker then scores the whole episode, `{"steps", "final", "stop"}`.
+`suites/crc_tools_v0.1` is the worked example: a mock surgery-risk model service
+with prediction, SHAP and kNN tools.
 
 Programmatic authoring: `examroom.authoring.templates.Builder` — see
 `scripts/author_world_model.py`.

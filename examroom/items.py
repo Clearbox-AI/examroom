@@ -33,10 +33,11 @@ class Kind(StrEnum):
     REGEX = "regex"                      # target is a regex the generation must match
     NUMERIC = "numeric"                  # first number in generation within tolerance
     PROGRAM = "program"                  # python checker "module:function(item, output) -> score"
+    AGENT = "agent"                      # native tool calls against a suite-local mock API; checker scores the episode
 
 
 LIKELIHOOD_KINDS = {Kind.CHOICE_LOGLIK, Kind.PAIR_LOGLIK}
-GENERATIVE_KINDS = {Kind.CHOICE_GENERATE, Kind.EXACT, Kind.REGEX, Kind.NUMERIC, Kind.PROGRAM}
+GENERATIVE_KINDS = {Kind.CHOICE_GENERATE, Kind.EXACT, Kind.REGEX, Kind.NUMERIC, Kind.PROGRAM, Kind.AGENT}
 
 
 class Provenance(BaseModel):
@@ -60,6 +61,10 @@ class Item(BaseModel):
     target: str | None = None
     tolerance: float | None = None
     checker: str | None = None
+    # agent: the mock API module ("./mock_api.py", exposing TOOLS and call(name, arguments, fixture))
+    # and the world it serves for this item (patients, model outputs…)
+    env: str | None = None
+    fixture: dict[str, Any] | None = None
     # bookkeeping
     category: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -90,6 +95,9 @@ class Item(BaseModel):
         elif k == Kind.PROGRAM:
             if not self.checker:
                 raise ValueError(f"{self.id}: program needs checker 'module:function'")
+        elif k == Kind.AGENT:
+            if not self.checker or not self.env:
+                raise ValueError(f"{self.id}: agent needs checker 'module:function' and env '<module>'")
         return self
 
     @property
@@ -156,8 +164,9 @@ class Suite:
         """Stable hash of every item (sorted by id) + task config + suite-local checker code.
 
         Checker files referenced as "<path>.py:function" (by items, or by
-        meta["calibration"]) are part of what the benchmark measures, so their
-        bytes are hashed too: editing a frozen suite's checker changes the hash.
+        meta["calibration"]) and agent mock APIs ("<path>.py") are part of what the
+        benchmark measures, so their bytes are hashed too: editing a frozen suite's
+        checker or mock API changes the hash.
         """
         h = hashlib.sha256()
         specs: set[str] = set()
@@ -166,6 +175,8 @@ class Suite:
             for it in sorted(self.items[t.name], key=lambda i: i.id):
                 if it.checker:
                     specs.add(it.checker)
+                if it.env:
+                    specs.add(it.env)
                 h.update(it.canonical().encode())
                 h.update(b"\n")
         if isinstance(self.meta.meta.get("calibration"), str):

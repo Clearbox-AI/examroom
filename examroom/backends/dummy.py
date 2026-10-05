@@ -15,6 +15,7 @@ from examroom.backends.base import BackendInfo, Stats, Timer
 class DummyBackend:
     supports_logprobs = True
     supports_generate = True
+    supports_tools = True  # never calls a tool: answers "A" at once (the no-tool-use floor)
 
     def __init__(self, mode: str = "uniform", **_):
         self.mode = mode
@@ -44,6 +45,13 @@ class DummyBackend:
             outs = ["A"] * n
         self.stats.tick(t.seconds, prompt_tokens=self._ntok(prompt), generated_tokens=n)
         return outs
+
+    def chat(self, messages, tools, max_tokens, temperature):
+        with Timer() as t:
+            reply = {"content": "A", "tool_calls": []}
+        self.stats.tick(t.seconds, prompt_tokens=sum(self._ntok(m.get("content") or "") for m in messages),
+                        generated_tokens=1)
+        return reply
 
     def close(self):
         pass

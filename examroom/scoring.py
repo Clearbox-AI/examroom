@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import importlib.util
+import json
 import math
 import re
 import string
@@ -231,6 +232,74 @@ def score_program(item: Item, task: Task, backend: Backend, root: Path | None = 
     return _sampled(item, task, backend, item.prompt, lambda o: checker(item, o))
 
 
+# --- agent ---------------------------------------------------------------------
+_TRUNC_RESULT = 400
+
+
+def _transcript(steps: list[dict], final: str, stop: str) -> str:
+    """The episode as one readable string, so reports show what the model did."""
+    lines = []
+    for st in steps:
+        args = json.dumps(st["arguments"], ensure_ascii=False) if st["arguments"] is not None else st["raw"]
+        res = json.dumps(st["result"], ensure_ascii=False)
+        lines += [f"-> {st['tool']}({args})",
+                  f"<- {res if len(res) <= _TRUNC_RESULT else res[:_TRUNC_RESULT] + ' …'}"]
+    lines.append(f"FINAL: {final}" if stop == "final" else f"[stopped: {stop}]")
+    return "\n".join(lines)
+
+
+def run_episode(item: Item, task: Task, backend: Backend, env, max_tokens: int, temperature: float) -> dict:
+    """Drive one tool-use episode: the model sees the item prompt and the env's tools,
+    each tool call it makes is answered by `env.call(name, arguments, item.fixture)`,
+    and the episode ends at the first turn without tool calls (the final answer) or
+    after `max_turns` model turns.  Returns {"steps", "final", "stop"} for the checker."""
+    messages: list[dict] = []
+    if task.scoring.get("system"):
+        messages.append({"role": "system", "content": task.scoring["system"]})
+    messages.append({"role": "user", "content": item.prompt})
+    steps: list[dict] = []
+    for _ in range(task.scoring.get("max_turns", 8)):
+        reply = backend.chat(messages, env.TOOLS, max_tokens, temperature)
+        calls = reply.get("tool_calls") or []
+        if not calls:
+            return {"steps": steps, "final": reply.get("content") or "", "stop": "final"}
+        # some servers reject an empty tool_calls list or "" content beside calls: send neither
+        messages.append({"role": "assistant", "content": reply.get("content") or None,
+                         "tool_calls": [{"id": c["id"], "type": "function",
+                                         "function": {"name": c["name"], "arguments": c["arguments"]}}
+                                        for c in calls]})
+        for c in calls:
+            try:
+                args = json.loads(c["arguments"] or "{}")
+            except json.JSONDecodeError:
+                args = None
+            if not isinstance(args, dict):
+                args, result = None, {"error": "arguments must be a JSON object"}
+            else:
+                result = env.call(c["name"], args, item.fixture or {})
+            steps.append({"tool": c["name"], "arguments": args, "result": result,
+                          **({"raw": c["arguments"]} if args is None else {})})
+            messages.append({"role": "tool", "tool_call_id": c["id"], "name": c["name"],
+                             "content": json.dumps(result, ensure_ascii=False)})
+    return {"steps": steps, "final": "", "stop": "max_turns"}
+
+
+def score_agent(item: Item, task: Task, backend: Backend, root: Path | None = None) -> tuple[float, dict]:
+    env = checker_module(item.env, root)
+    checker = load_checker(item.checker, root)
+    temperature = task.scoring.get("temperature", 0.0 if item.samples == 1 else 0.7)
+    max_tokens = max(task.scoring.get("max_tokens", item.max_tokens), task.scoring.get("min_max_tokens", 0))
+    episodes = [run_episode(item, task, backend, env, max_tokens, temperature) for _ in range(item.samples)]
+    verdicts = [checker(item, ep) for ep in episodes]
+    scores = [v["score"] if isinstance(v, dict) else float(v) for v in verdicts]
+    detail: dict[str, Any] = {"outputs": [_transcript(**ep) for ep in episodes], "per_sample": scores,
+                              "episodes": episodes}
+    extras = [v for v in verdicts if isinstance(v, dict)]
+    if extras:
+        detail["judge"] = extras if len(extras) > 1 else extras[0]
+    return sum(scores) / len(scores), detail
+
+
 SCORERS = {
     Kind.CHOICE_LOGLIK: score_choice_loglik,
     Kind.PAIR_LOGLIK: score_pair_loglik,
@@ -239,6 +308,7 @@ SCORERS = {
     Kind.REGEX: score_regex,
     Kind.NUMERIC: score_numeric,
     Kind.PROGRAM: score_program,
+    Kind.AGENT: score_agent,
 }
 
 
@@ -251,6 +321,8 @@ def resolve_protocol(kind: Kind, backend: Backend) -> Kind:
     if kind in (Kind.CHOICE_GENERATE, Kind.EXACT, Kind.REGEX, Kind.NUMERIC, Kind.PROGRAM) \
             and not backend.supports_generate:
         raise RuntimeError(f"{kind} items need a backend that can generate")
+    if kind == Kind.AGENT and not getattr(backend, "supports_tools", False):
+        raise RuntimeError("agent items need a backend with native tool calling (openai:…, anthropic:…)")
     return kind
 
 
@@ -259,6 +331,8 @@ def score_item(item: Item, task: Task, backend: Backend, root: Path | None = Non
     protocol = resolve_protocol(item.kind, backend)
     if protocol == Kind.PROGRAM:
         score, detail = score_program(item, task, backend, root)
+    elif protocol == Kind.AGENT:
+        score, detail = score_agent(item, task, backend, root)
     else:
         score, detail = SCORERS[protocol](item, task, backend)
     return score, detail, protocol
