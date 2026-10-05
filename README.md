@@ -174,6 +174,13 @@ examroom publish results results/ --repo clearbox-ai/examroom-results --registry
 examroom publish page leaderboard.html --repo clearbox-ai/examroom-leaderboard   # a static Space
 ```
 
+When a board suite names its public split (`"public": "hf://…"` or a path), the page
+also lists, for each model, public items it failed: the request, the expected
+answer, the model's output and the checker's reasons. These come from the model's
+profiled run on the public split, so each ranked model needs that run too. The
+public split must carry the `HELDOUT_MANIFEST.json` of the ranked suite.
+`--examples N` sets how many are shown per task (lowest scores first; `0` skips them).
+
 `publish` never creates repos, refuses to put a held-out suite in a public repo,
 and refuses to overwrite a published suite directory with different content.
 

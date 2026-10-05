@@ -367,11 +367,19 @@ def cmd_leaderboard(a):
     from examroom.leaderboard import load_board, render_leaderboard
     from examroom.registry import Registry
 
+    from examroom.leaderboard import check_public
+
     records = load_exports(a.results)
     board = load_board(a.board)
-    out = render_leaderboard(records, board, Registry.load(a.registry), a.out)
+    public = {}
+    if a.examples:
+        for si, s in enumerate(board["suites"]):
+            if s.get("public"):
+                public[si] = load_suite(s["public"])
+                check_public(s, public[si])
+    out = render_leaderboard(records, board, Registry.load(a.registry), a.out, public, a.examples)
     print(f"wrote {out} ({len(records)} run records, {len(board['suites'])} suites, "
-          f"profiles {', '.join(board['profiles'])})")
+          f"profiles {', '.join(board['profiles'])}, failed examples from {len(public)} public splits)")
     return 0
 
 
@@ -613,6 +621,9 @@ def main(argv=None):
     p.add_argument("results", help="directory of exported run records (searched recursively)")
     p.add_argument("--board", required=True, help="board.json: ranked suites (by hash) and profiles")
     p.add_argument("--registry", default="models.json"); p.add_argument("--out", default="leaderboard.html")
+    p.add_argument("--examples", type=int, default=2, metavar="N",
+                   help="failed public-split items shown per model and task, from runs on each board suite's "
+                        "'public' split (loaded, hf:// fetched); 0 skips them")
     p.set_defaults(fn=cmd_leaderboard)
 
     p = sub.add_parser("publish", help="upload to the Hugging Face Hub (repos must exist; needs `hf auth login`)")

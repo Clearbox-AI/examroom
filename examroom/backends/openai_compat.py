@@ -13,6 +13,10 @@ import time
 from examroom.backends.base import BackendInfo, Stats, Timer, strip_reasoning
 
 
+class _NoChoices(RuntimeError):
+    pass
+
+
 class OpenAICompatBackend:
     supports_logprobs = False
     supports_generate = True
@@ -56,8 +60,10 @@ class OpenAICompatBackend:
                         model=self.model, **kwargs,
                         **({"extra_body": self.extra_body} if self.extra_body else {}),
                     )
+                    if not resp.choices:   # routers can answer 200 with an upstream error and no choices
+                        raise _NoChoices(getattr(resp, "error", None) or "response without choices")
                     break
-                except (RateLimitError, APIConnectionError, APITimeoutError, InternalServerError):
+                except (RateLimitError, APIConnectionError, APITimeoutError, InternalServerError, _NoChoices):
                     if attempt == 7:
                         raise
                     time.sleep(min(2.0 * 2 ** attempt, 60.0))

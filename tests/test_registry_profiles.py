@@ -211,3 +211,18 @@ def test_hub_weight_files_and_facts(monkeypatch, tmp_path, capsys):
     capsys.readouterr()
     main(["models", "--registry", reg, "list"])
     assert "active=dense" in capsys.readouterr().out
+
+
+def test_openai_retries_a_reply_without_choices(monkeypatch):
+    pytest.importorskip("openai")
+    from types import SimpleNamespace as NS
+
+    from examroom.backends import openai_compat
+    from examroom.backends.openai_compat import OpenAICompatBackend
+
+    replies = [NS(choices=None, usage=None, error={"message": "upstream error"}),
+               NS(choices=[NS(message=NS(content="ok"))], usage=None)]
+    b = OpenAICompatBackend("m", base_url="https://openrouter.ai/api/v1")
+    b.client = NS(chat=NS(completions=NS(create=lambda **_: replies.pop(0))))
+    monkeypatch.setattr(openai_compat.time, "sleep", lambda s: None)
+    assert b.generate("hi", 5, 0.0, 1) == ["ok"] and not replies

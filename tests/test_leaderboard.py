@@ -66,7 +66,8 @@ def test_cli_split_run_export_leaderboard(tmp_path, capsys):
     for model, quant in (("org/small", "Q4_K_M"), ("org/tiny", "bf16")):
         assert main(["run", str(held), "dummy:uniform", "--profile", "nothink", "--opt", f"model_id={model}",
                      "--opt", f"quantization={quant}", "--ledger", db]) == 0
-    assert main(["run", str(pub), "dummy:uniform", "--profile", "nothink", "--ledger", db]) == 0
+    assert main(["run", str(pub), "dummy:uniform", "--profile", "nothink", "--opt", "model_id=org/small",
+                 "--opt", "quantization=Q4_K_M", "--ledger", db]) == 0
     assert main(["run", str(held), "dummy:uniform", "--ledger", db]) == 0          # unprofiled: not exported
     assert main(["export", "--profiled", "--out", str(res), "--ledger", db]) == 0
     recs = load_exports(res)
@@ -87,6 +88,24 @@ def test_cli_split_run_export_leaderboard(tmp_path, capsys):
     page = out.read_text()
     assert "org/small" in page and "org/tiny" in page and "Bilingual" in page
     assert "No ranked runs under this profile yet." in page                       # think@1 is empty
+    assert "Failed examples" not in page                                           # no public split named
+
+    # naming the public split adds its failed items, never held-out ones
+    entry = {"name": "bi-heldout", "version": "1.0", "hash": hh, "label": "Bilingual", "public": str(pub)}
+    board.write_text(json.dumps({"profiles": ["nothink@1"], "suites": [entry]}))
+    assert main(["leaderboard", str(res), "--board", str(board), "--registry", str(reg), "--out", str(out),
+                 "--examples", "1"]) == 0
+    page = out.read_text()
+    pub_ids = {it.id for _, it in load_suite(pub).iter_items()}
+    held_ids = {it.id for _, it in load_suite(held).iter_items()}
+    shown = set(re.findall(r"s-(?:en|it)-\d{3}", page))
+    assert "Failed examples" in page and shown and shown <= pub_ids and not shown & held_ids
+    assert page.count('<div class="ex">') == 2                                     # 1 per task, org/small only (org/tiny never ran it)
+    assert 'target="_blank" rel="noopener"' in page or "huggingface.co" not in page
+    entry["hash"] = "0" * 16                                                       # not the public split's partner
+    board.write_text(json.dumps({"profiles": ["nothink@1"], "suites": [entry]}))
+    with pytest.raises(ValueError, match="paired"):
+        main(["leaderboard", str(res), "--board", str(board), "--registry", str(reg), "--out", str(out)])
 
 
 def test_board_latest_run_wins_and_overall_needs_every_suite(tmp_path):

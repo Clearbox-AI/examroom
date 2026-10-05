@@ -12,6 +12,11 @@ A row is a (model, precision) pair; when several runs exist for a row, suite and
 profile, the latest counts.  A suite score is the mean of its task scores (each
 task weighs the same whatever its size); the overall score is the mean over the
 board's suites and is only given to rows that ran all of them.
+
+A board suite may name its public split ("public"); given that suite and its
+exported runs, the page also shows, per model, the public items it failed: the
+request, the expected answer, the model's output and the checker's reasons.  The
+ranked held-out items are never shown (their exports carry no per-item data).
 """
 
 from __future__ import annotations
@@ -19,10 +24,13 @@ from __future__ import annotations
 import datetime as dt
 import html
 import json
+import os
+import re
 from pathlib import Path
 
 from examroom.diff import wilson
 from examroom.registry import TIERS, Registry, fmt_size
+from examroom.splits import is_heldout
 
 
 def load_board(path: str | Path) -> dict:
@@ -36,8 +44,60 @@ def load_board(path: str | Path) -> dict:
     return board
 
 
-def build_board(records: list[dict], board: dict, registry: Registry) -> dict:
+def check_public(board_suite: dict, public) -> None:
+    """The public split must be the other half of the ranked held-out suite."""
+    if is_heldout(public.meta.name):
+        raise ValueError(f"{board_suite['name']}: 'public' names a held-out suite ({public.meta.name})")
+    manifest = public.root / "HELDOUT_MANIFEST.json"
+    paired = json.loads(manifest.read_text()).get("content_hash") if manifest.exists() else None
+    if paired != board_suite["hash"]:
+        raise ValueError(f"{board_suite['name']}: public split {public.meta.name}@{public.meta.version} is paired "
+                         f"with held-out hash {paired}, not {board_suite['hash']}")
+
+
+def _row_key(b: dict, registry: Registry):
+    ms = registry.size(b)
+    return (ms.model_id or f"{b.get('backend')}:{b.get('model')}", ms.precision), ms
+
+
+def _shared_prefix(prompts: list[str]) -> str:
+    """The instructions every item of a task starts with, up to a line break."""
+    p = os.path.commonprefix(prompts) if len(prompts) > 1 else ""
+    return p[:p.rfind("\n") + 1]
+
+
+def _examples(rec: dict, public, prefixes: dict[str, str], per_task: int) -> dict:
+    items = {it.id: it for _, it in public.iter_items()}
+    by_task: dict[str, list] = {}
+    for r in rec.get("results", []):
+        by_task.setdefault(r["task"], []).append(r)
+    tasks = {}
+    for t in [t.name for t in public.meta.tasks if t.name in by_task]:
+        rs = by_task[t]
+        failed = sorted((r for r in rs if r["score"] < 1), key=lambda r: (r["score"], r["item_id"]))
+        shown = []
+        for r in failed[:per_task]:
+            it, d = items.get(r["item_id"]), r.get("detail") or {}
+            if it is None:
+                continue
+            outs = d.get("outputs") or []
+            why = (d.get("judge") or {}).get("failed") or []
+            shown.append({"item_id": r["item_id"], "score": r["score"],
+                          "request": it.prompt[len(prefixes.get(t, "")):], "expected": it.target,
+                          "output": outs[0] if outs else "", "why": [str(w) for w in why]})
+        tasks[t] = {"n": len(rs), "failed": len(failed), "shown": shown}
+    return {"run_id": rec["run_id"], "tasks": tasks}
+
+
+def build_board(records: list[dict], board: dict, registry: Registry, public: dict | None = None,
+                per_task: int = 2) -> dict:
+    """`public` maps a board suite's index to its loaded public split (see check_public);
+    rows then carry up to `per_task` failed public items per task."""
     suites = board["suites"]
+    public = public or {}
+    prefixes = {si: {t.name: _shared_prefix([it.prompt for it in pub.items[t.name]]) for t in pub.meta.tasks}
+                for si, pub in public.items()}
+    pub_ids = {si: (pub.meta.name, pub.meta.version, pub.content_hash()) for si, pub in public.items()}
     views = []
     for profile in board["profiles"]:
         rows: dict[tuple, dict] = {}
@@ -47,14 +107,13 @@ def build_board(records: list[dict], board: dict, registry: Registry) -> dict:
                 if (rec["suite"], rec["suite_version"], rec["suite_hash"]) != (sc["name"], sc["version"], sc["hash"]) \
                         or b.get("profile") != profile:
                     continue
-                ms = registry.size(b)
-                key = (ms.model_id or f"{b.get('backend')}:{b.get('model')}", ms.precision)
+                key, ms = _row_key(b, registry)
                 row = rows.setdefault(key, {
                     "model": key[0], "registered": ms.model_id is not None, "precision": ms.precision,
                     "n_params": ms.n_params, "active_params": ms.active_params, "weights_mb": ms.weights_mb,
                     "weights_source": ms.weights_source, "tiers": ms.tiers,
                     "hub": registry.models.get(ms.model_id, {}).get("hub", {}).get("repo"),
-                    "suites": {},
+                    "suites": {}, "examples": {},
                 })
                 prev = row["suites"].get(si)
                 if prev and prev["ts"] >= rec["ts"]:
@@ -66,6 +125,17 @@ def build_board(records: list[dict], board: dict, registry: Registry) -> dict:
                 row["suites"][si] = {"score": sum(v["score"] for v in tasks.values()) / len(tasks),
                                      "tasks": tasks, "run_id": rec["run_id"], "ts": rec["ts"],
                                      "served_by": b.get("base_url") or b.get("backend")}
+        for si, ident in pub_ids.items():
+            latest = {}
+            for rec in records:
+                if (rec["suite"], rec["suite_version"], rec["suite_hash"]) != ident or is_heldout(rec["suite"]) \
+                        or rec["backend"].get("profile") != profile or "results" not in rec:
+                    continue
+                key, _ = _row_key(rec["backend"], registry)
+                if key in rows and (key not in latest or latest[key]["ts"] < rec["ts"]):
+                    latest[key] = rec
+            for key, rec in latest.items():
+                rows[key]["examples"][si] = _examples(rec, public[si], prefixes[si], per_task)
         for row in rows.values():
             have = [row["suites"][i]["score"] for i in range(len(suites)) if i in row["suites"]]
             row["overall"] = sum(have) / len(have) if len(have) == len(suites) else None
@@ -73,7 +143,7 @@ def build_board(records: list[dict], board: dict, registry: Registry) -> dict:
                                                       -sum(s["score"] for s in r["suites"].values())))
         views.append({"profile": profile, "rows": ranked})
     return {"title": board.get("title", "examroom leaderboard"), "suites": suites, "views": views,
-            "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+            "instructions": prefixes, "generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
 
 
 # --- rendering -------------------------------------------------------------------
@@ -85,12 +155,14 @@ def _pct(x) -> str:
     return "–" if x is None else f"{100 * x:.1f}"
 
 
-def _model_cell(r) -> str:
+def _model_cell(r, fx_id: str | None = None) -> str:
     name = _e(r["model"])
-    if r["hub"]:
-        name = f'<a href="https://huggingface.co/{_e(r["hub"])}">{name}</a>'
-    prec = r["precision"] or "served (precision unstated)"
-    return f'{name}<div class="sub">{_e(prec)}</div>'
+    if r["hub"]:   # the Space shows the page in a frame, which huggingface.co refuses: open a new tab
+        name = f'<a href="https://huggingface.co/{_e(r["hub"])}" target="_blank" rel="noopener">{name}</a>'
+    prec = _e(r["precision"] or "served (precision unstated)")
+    if fx_id:
+        prec += f' · <a class="fx" href="#{fx_id}">failed examples</a>'
+    return f'{name}<div class="sub">{prec}</div>'
 
 
 def _size_cells(r) -> str:
@@ -123,7 +195,8 @@ def render_board(data: dict) -> str:
                 f'<td class="num" title="run {_e(r["suites"][si]["run_id"])} · {_e(r["suites"][si]["ts"][:10])}">'
                 f'{_pct(r["suites"][si]["score"])}</td>' if si in r["suites"] else '<td class="num">–</td>'
                 for si in range(len(suites)))
-            body.append(f'<tr {_row_attrs(r)}><td class="rank">{i}</td><td>{_model_cell(r)}</td>{_size_cells(r)}'
+            fx_id = f"fx-{pid}-{i}" if r["examples"] else None
+            body.append(f'<tr {_row_attrs(r)}><td class="rank">{i}</td><td>{_model_cell(r, fx_id)}</td>{_size_cells(r)}'
                         f'<td class="num strong">{_pct(r["overall"])}</td>{cells}</tr>')
         details = []
         for si, s in enumerate(suites):
@@ -149,7 +222,7 @@ def render_board(data: dict) -> str:
         panels.append(
             f'<section id="{pid}" class="panel"{"" if vi == 0 else " hidden"}>{empty}'
             f'<div class="scroll"><table class="sortable"><thead>{head}</thead><tbody>{"".join(body)}</tbody></table></div>'
-            f'<h2>Per task</h2>{"".join(details)}</section>')
+            f'<h2>Per task</h2>{"".join(details)}{_examples_section(v["rows"], suites, data, pid)}</section>')
     filters = "".join(f'<button class="filter" data-tier="{t}" title="{_e(tier_rules.get(t, ""))}">{t}</button>'
                       for t, _, _ in TIERS)
     return _PAGE.format(title=_e(data["title"]), tabs="".join(tabs), panels="".join(panels), filters=filters,
@@ -157,9 +230,58 @@ def render_board(data: dict) -> str:
                         rules=" · ".join(f"<b>{t}</b> {_e(d)}" for t, d in tier_rules.items()))
 
 
-def render_leaderboard(records: list[dict], board: dict, registry: Registry, out: str | Path) -> Path:
+_SENTINEL = re.compile(r"<object object at 0x[0-9a-f]+>")   # a checker's "argument missing" marker
+
+
+def _pre(label: str, text: str) -> str:
+    return f'<div class="lbl">{label}</div><pre>{_e(text)}</pre>' if text else ""
+
+
+def _examples_section(rows: list[dict], suites: list[dict], data: dict, pid: str) -> str:
+    if not any(r["examples"] for r in rows):
+        return ""
+    instr = "".join(
+        f'<details><summary class="sub">Task instructions: {_e(s.get("label", s["name"]))}</summary>'
+        + "".join(f'<div class="lbl">{_e(t)}</div><pre>{_e(text)}</pre>'
+                  for t, text in data["instructions"].get(si, {}).items() if text)
+        + "</details>"
+        for si, s in enumerate(suites) if data["instructions"].get(si))
+    blocks = []
+    for i, r in enumerate(rows, 1):
+        if not r["examples"]:
+            continue
+        parts = []
+        for si, ex in sorted(r["examples"].items()):
+            for t, te in ex["tasks"].items():      # in suite order
+                if not te["failed"]:
+                    parts.append(f'<h4>{_e(t)} <span class="sub">no failures in {te["n"]} items</span></h4>')
+                    continue
+                parts.append(f'<h4>{_e(t)} <span class="sub">{te["failed"]} of {te["n"]} items below full score'
+                             f'{"; lowest scores shown" if te["failed"] > len(te["shown"]) else ""}</span></h4>')
+                for e in te["shown"]:
+                    why = "".join(f"<li>{_e(_SENTINEL.sub('(missing)', w))}</li>" for w in e["why"])
+                    parts.append(
+                        f'<div class="ex"><div class="sub">{_e(e["item_id"])} · score {e["score"]:.2f}</div>'
+                        f'{_pre("request", e["request"])}{_pre("expected", e["expected"])}'
+                        f'{_pre("model output", e["output"])}'
+                        f'{f"<div class=lbl>checker</div><ul>{why}</ul>" if why else ""}</div>')
+            label = suites[si].get("label", suites[si]["name"])
+            parts.insert(0, f'<p class="sub">{_e(label)}: public-split run {_e(ex["run_id"])}</p>')
+        failed = sum(te["failed"] for ex in r["examples"].values() for te in ex["tasks"].values())
+        total = sum(te["n"] for ex in r["examples"].values() for te in ex["tasks"].values())
+        blocks.append(f'<details id="fx-{pid}-{i}" class="fxm"><summary>{i}. {_e(r["model"])}'
+                      f' <span class="sub">{failed} of {total} public items below full score</span></summary>'
+                      f'{"".join(parts)}</details>')
+    return ('<h2>Failed examples</h2><p class="sub">From each model\'s run on the public split: the same generator '
+            'and tasks as the ranked suite, but different items (the held-out items are never published). '
+            'Requests are shown without the instructions every item of a task shares; those are listed '
+            f'once below.</p>{instr}{"".join(blocks)}')
+
+
+def render_leaderboard(records: list[dict], board: dict, registry: Registry, out: str | Path,
+                       public: dict | None = None, per_task: int = 2) -> Path:
     out = Path(out)
-    out.write_text(render_board(build_board(records, board, registry)))
+    out.write_text(render_board(build_board(records, board, registry, public, per_task)))
     return out
 
 
@@ -189,6 +311,10 @@ th.sort{{cursor:pointer}} th.sort:hover{{color:var(--fg)}}
 a{{color:var(--accent);text-decoration:none}} a:hover{{text-decoration:underline}}
 details{{margin:8px 0}} summary{{cursor:pointer;padding:6px 0;font-weight:600}}
 code{{font-size:.8rem}} .empty{{color:var(--muted)}}
+h4{{margin:16px 0 4px;font-size:.95rem}} .lbl{{color:var(--muted);font-size:.75rem;margin-top:6px;text-transform:uppercase;letter-spacing:.04em}}
+pre{{white-space:pre-wrap;word-break:break-word;max-height:14em;overflow:auto;margin:2px 0;padding:6px 8px;background:var(--card);border:1px solid var(--line);border-radius:6px;font-size:.8rem}}
+.ex{{border-left:3px solid var(--line);padding:2px 0 6px 10px;margin:8px 0}} .ex ul{{margin:2px 0;padding-left:20px;font-size:.85rem}}
+details.fxm{{border-top:1px solid var(--line)}} details.fxm>summary{{padding:8px 0}}
 footer{{color:var(--muted);font-size:.8rem;margin-top:32px}}
 </style></head><body><main>
 <h1>{title}</h1>
@@ -208,6 +334,8 @@ document.querySelectorAll('.filter').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('on',x===b));
   const t=b.dataset.tier;
   document.querySelectorAll('tr[data-tiers]').forEach(r=>r.hidden=!!t&&!r.dataset.tiers.split(' ').includes(t));}}));
+document.querySelectorAll('a.fx').forEach(a=>a.addEventListener('click',()=>{{
+  const d=document.getElementById(a.getAttribute('href').slice(1));if(d)d.open=true;}}));
 const val=td=>{{const v=parseFloat(td.textContent);return isNaN(v)?-1:v}};
 document.querySelectorAll('table.sortable th.sort').forEach(th=>th.addEventListener('click',()=>{{
   const tb=th.closest('table').tBodies[0],i=[...th.parentNode.children].indexOf(th);
