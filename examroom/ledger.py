@@ -102,6 +102,16 @@ class Ledger:
         rows = self.con.execute("SELECT task, score, n FROM task_scores WHERE run_id = ?", (run_id,))
         return {r["task"]: (r["score"], r["n"]) for r in rows}
 
+    def annotate(self, run_id: str, **fields) -> None:
+        """Merge model metadata (n_params, active_params, weights_mb, quantization) into a
+        recorded run, for sizes an API backend cannot report. Results are never touched."""
+        row = self.run(run_id)
+        backend = {**json.loads(row["backend_json"]), **fields}
+        with self.con:
+            self.con.execute(
+                "UPDATE runs SET backend_json = ?, n_params = ?, quantization = ? WHERE run_id = ?",
+                (json.dumps(backend), backend.get("n_params"), backend.get("quantization"), row["run_id"]))
+
     def set_metric(self, run_id: str, name: str, value: float | None, detail: dict | None = None) -> None:
         with self.con:
             self.con.execute("INSERT OR REPLACE INTO metrics VALUES (?,?,?,?)",

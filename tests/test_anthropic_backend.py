@@ -72,3 +72,34 @@ def test_loglik_unsupported(monkeypatch):
     assert b.supports_logprobs is False
     with pytest.raises(NotImplementedError):
         b.loglik("p", [" a", " b"])
+
+
+class _ToolUse:
+    type = "tool_use"
+
+    def __init__(self, id, name, input):
+        self.id, self.name, self.input = id, name, input
+
+
+def test_chat_translates_tool_turns(monkeypatch):
+    resp = _Resp([_Block("text", "checking"), _ToolUse("tu_2", "lookup", {"q": "x"})], stop_reason="tool_use")
+    b = _backend(monkeypatch, resp)
+    tools = [{"name": "lookup", "description": "d", "inputSchema": {"type": "object", "properties": {}}}]
+    messages = [
+        {"role": "system", "content": "be brief"},
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "tu_0", "type": "function", "function": {"name": "lookup", "arguments": '{"q": "a"}'}},
+            {"id": "tu_1", "type": "function", "function": {"name": "lookup", "arguments": '{"q": "b"}'}}]},
+        {"role": "tool", "tool_call_id": "tu_0", "name": "lookup", "content": '{"r": 1}'},
+        {"role": "tool", "tool_call_id": "tu_1", "name": "lookup", "content": '{"r": 2}'},
+    ]
+    out = b.chat(messages, tools, max_tokens=64, temperature=0.0)
+    assert out == {"content": "checking", "tool_calls": [{"id": "tu_2", "name": "lookup", "arguments": '{"q": "x"}'}]}
+    (call,) = b.client.messages.calls
+    assert call["system"] == "be brief" and "temperature" not in call
+    assert call["tools"] == [{"name": "lookup", "description": "d", "input_schema": {"type": "object", "properties": {}}}]
+    conv = call["messages"]
+    assert [m["role"] for m in conv] == ["user", "assistant", "user"]   # both results in one user turn
+    assert [b["input"] for b in conv[1]["content"]] == [{"q": "a"}, {"q": "b"}]
+    assert [r["tool_use_id"] for r in conv[2]["content"]] == ["tu_0", "tu_1"]

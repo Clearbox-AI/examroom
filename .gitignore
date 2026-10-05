@@ -7,3 +7,6 @@ logs/
 yourbench_demo/dataset/
 yourbench_demo/ingested/
 report.html
+leaderboard.html
+private/
+results/

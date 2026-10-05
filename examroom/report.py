@@ -36,6 +36,8 @@ def _expected(it) -> tuple[str, str | None]:
         return exp + tol, None
     if it.kind == Kind.PROGRAM:
         return f"scored programmatically by {it.checker}", None
+    if it.kind == Kind.AGENT:
+        return f"tool-use episode against {it.env}, scored by {it.checker}", None
     return str(it.target), None  # exact / regex
 
 

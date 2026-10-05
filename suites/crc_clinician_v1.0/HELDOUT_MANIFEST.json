@@ -1,0 +1,161 @@
+{
+  "suite": "crc_clinician-heldout",
+  "version": "1.0",
+  "content_hash": "2dd36a20ec6dd3f9",
+  "frozen_at": "2026-10-03T15:24:08+00:00",
+  "git_commit": "1d57976e1a8d7fc34c360b66a078c604075f5625",
+  "n_items": 1000,
+  "meta": {
+    "status": "release 1.0 (demo)",
+    "use_case": "RISE model/CLINICIAN_INTERFACE.md: local model as tool-orchestrating clinician interface",
+    "split_group_id": "-(en|it)-",
+    "acceptance": {
+      "route_*": 0.95,
+      "next_*": 0.9,
+      "narrate_*": 0.9,
+      "extract_*": 0.9,
+      "grounded_*": 0.9
+    },
+    "split": "heldout",
+    "split_of": {
+      "suite": "crc_clinician",
+      "version": "1.0",
+      "content_hash": "059772f506a2f771",
+      "heldout_frac": 0.5,
+      "seed": 0,
+      "group_id": "-(en|it)-"
+    }
+  },
+  "files": {
+    "extract_en.jsonl": {
+      "task": "extract_en",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "extract_it.jsonl": {
+      "task": "extract_it",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "route_en.jsonl": {
+      "task": "route_en",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "route_it.jsonl": {
+      "task": "route_it",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "next_en.jsonl": {
+      "task": "next_en",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "next_it.jsonl": {
+      "task": "next_it",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "base": 50,
+        "hard": 50
+      }
+    },
+    "narrate_en.jsonl": {
+      "task": "narrate_en",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "hard": 50,
+        "base": 50
+      }
+    },
+    "narrate_it.jsonl": {
+      "task": "narrate_it",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "hard": 50,
+        "base": 50
+      }
+    },
+    "grounded_en.jsonl": {
+      "task": "grounded_en",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "hard": 50,
+        "base": 50
+      }
+    },
+    "grounded_it.jsonl": {
+      "task": "grounded_it",
+      "kind": "program",
+      "n_items": 100,
+      "provenance": {
+        "template:scripts/author_crc_clinician.py": 100
+      },
+      "seeds": [],
+      "categories": {
+        "hard": 50,
+        "base": 50
+      }
+    }
+  }
+}
