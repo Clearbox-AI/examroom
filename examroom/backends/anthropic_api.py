@@ -54,6 +54,7 @@ class AnthropicBackend:
         self.thinking = _THINKING[thinking]
         self.effort = effort
         self.client = Anthropic(base_url=base_url, api_key=os.environ.get(api_key_env))
+        self._thinking_turns: dict[str, list] = {}  # first tool_use id -> the reply's raw content
         self.info = BackendInfo(
             backend="anthropic",
             model=model,
@@ -108,6 +109,13 @@ class AnthropicBackend:
                 else:
                     conv.append({"role": "user", "content": [block]})
             elif m["role"] == "assistant":
+                # a turn with thinking goes back as the API returned it: the scorer's OpenAI-format
+                # history has no place for thinking blocks, and they must be replayed unmodified
+                raw = next((self._thinking_turns[c["id"]] for c in m.get("tool_calls") or []
+                            if c["id"] in self._thinking_turns), None)
+                if raw is not None:
+                    conv.append({"role": "assistant", "content": raw})
+                    continue
                 blocks = [{"type": "text", "text": m["content"]}] if m.get("content") else []
                 for c in m.get("tool_calls") or []:
                     try:
@@ -140,6 +148,8 @@ class AnthropicBackend:
                  for b in resp.content if b.type == "tool_use"]
         if resp.stop_reason == "refusal":
             text, calls = "", []
+        if calls and any(b.type in ("thinking", "redacted_thinking") for b in resp.content):
+            self._thinking_turns[calls[0]["id"]] = list(resp.content)
         return {"content": text, "tool_calls": calls}
 
     def close(self):

@@ -103,3 +103,19 @@ def test_chat_translates_tool_turns(monkeypatch):
     assert [m["role"] for m in conv] == ["user", "assistant", "user"]   # both results in one user turn
     assert [b["input"] for b in conv[1]["content"]] == [{"q": "a"}, {"q": "b"}]
     assert [r["tool_use_id"] for r in conv[2]["content"]] == ["tu_0", "tu_1"]
+
+
+def test_chat_replays_thinking_blocks_unmodified(monkeypatch):
+    content = [_Block("thinking"), _ToolUse("tu_0", "lookup", {"q": "a"})]
+    b = _backend(monkeypatch, _Resp(content, stop_reason="tool_use"), thinking="adaptive")
+    tools = [{"name": "lookup", "inputSchema": {"type": "object", "properties": {}}}]
+    user = {"role": "user", "content": "hi"}
+    b.chat([user], tools, max_tokens=64, temperature=0.0)
+    history = [user,
+               {"role": "assistant", "content": None, "tool_calls": [
+                   {"id": "tu_0", "type": "function", "function": {"name": "lookup", "arguments": '{"q": "a"}'}}]},
+               {"role": "tool", "tool_call_id": "tu_0", "name": "lookup", "content": "{}"}]
+    b.chat(history, tools, max_tokens=64, temperature=0.0)
+    conv = b.client.messages.calls[-1]["messages"]
+    assert conv[1] == {"role": "assistant", "content": content}
+    assert conv[2]["content"][0]["tool_use_id"] == "tu_0"
