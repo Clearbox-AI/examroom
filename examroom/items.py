@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+from collections import Counter
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterator
@@ -30,10 +33,11 @@ class Kind(StrEnum):
     REGEX = "regex"                      # target is a regex the generation must match
     NUMERIC = "numeric"                  # first number in generation within tolerance
     PROGRAM = "program"                  # python checker "module:function(item, output) -> score"
+    AGENT = "agent"                      # native tool calls against a suite-local mock API; checker scores the episode
 
 
 LIKELIHOOD_KINDS = {Kind.CHOICE_LOGLIK, Kind.PAIR_LOGLIK}
-GENERATIVE_KINDS = {Kind.CHOICE_GENERATE, Kind.EXACT, Kind.REGEX, Kind.NUMERIC, Kind.PROGRAM}
+GENERATIVE_KINDS = {Kind.CHOICE_GENERATE, Kind.EXACT, Kind.REGEX, Kind.NUMERIC, Kind.PROGRAM, Kind.AGENT}
 
 
 class Provenance(BaseModel):
@@ -57,6 +61,10 @@ class Item(BaseModel):
     target: str | None = None
     tolerance: float | None = None
     checker: str | None = None
+    # agent: the mock API module ("./mock_api.py", exposing TOOLS and call(name, arguments, fixture))
+    # and the world it serves for this item (patients, model outputs…)
+    env: str | None = None
+    fixture: dict[str, Any] | None = None
     # bookkeeping
     category: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -87,6 +95,9 @@ class Item(BaseModel):
         elif k == Kind.PROGRAM:
             if not self.checker:
                 raise ValueError(f"{self.id}: program needs checker 'module:function'")
+        elif k == Kind.AGENT:
+            if not self.checker or not self.env:
+                raise ValueError(f"{self.id}: agent needs checker 'module:function' and env '<module>'")
         return self
 
     @property
@@ -153,8 +164,9 @@ class Suite:
         """Stable hash of every item (sorted by id) + task config + suite-local checker code.
 
         Checker files referenced as "<path>.py:function" (by items, or by
-        meta["calibration"]) are part of what the benchmark measures, so their
-        bytes are hashed too: editing a frozen suite's checker changes the hash.
+        meta["calibration"]) and agent mock APIs ("<path>.py") are part of what the
+        benchmark measures, so their bytes are hashed too: editing a frozen suite's
+        checker or mock API changes the hash.
         """
         h = hashlib.sha256()
         specs: set[str] = set()
@@ -163,6 +175,8 @@ class Suite:
             for it in sorted(self.items[t.name], key=lambda i: i.id):
                 if it.checker:
                     specs.add(it.checker)
+                if it.env:
+                    specs.add(it.env)
                 h.update(it.canonical().encode())
                 h.update(b"\n")
         if isinstance(self.meta.meta.get("calibration"), str):
@@ -197,6 +211,11 @@ def write_jsonl(path: Path, items: list[Item]) -> None:
 
 
 def load_suite(root: str | Path) -> Suite:
+    """Load a suite directory, or a Hub reference hf://<org>/<repo>/<suite dir>[@<revision>]."""
+    if str(root).startswith("hf://"):
+        from examroom.hub import fetch_suite
+
+        root = fetch_suite(str(root))
     root = Path(root)
     meta = SuiteMeta.model_validate_json((root / "suite.json").read_text())
     items: dict[str, list[Item]] = {}
@@ -220,3 +239,39 @@ def save_suite(root: str | Path, meta: SuiteMeta, items: dict[str, list[Item]]) 
     for t in meta.tasks:
         write_jsonl(root / t.file, items[t.name])
     return Suite(root, meta, items)
+
+
+def build_manifest(suite: Suite) -> dict:
+    """MANIFEST.json content: the content hash plus counts and provenance (no item text)."""
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        commit = None
+    return {
+        "suite": suite.name, "version": suite.version, "content_hash": suite.content_hash(),
+        "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"), "git_commit": commit,
+        "n_items": len(suite),
+        "meta": suite.meta.meta,
+        "files": {
+            t.file: {
+                "task": t.name, "kind": str(t.kind), "n_items": len(suite.items[t.name]),
+                "provenance": dict(Counter(f"{i.provenance.method}:{i.provenance.source}" for i in suite.items[t.name])),
+                "seeds": sorted({i.provenance.seed for i in suite.items[t.name] if i.provenance.seed is not None}),
+                "categories": dict(Counter(i.category for i in suite.items[t.name])),
+            } for t in suite.tasks
+        },
+    }
+
+
+def write_manifest(suite: Suite, force: bool = False) -> dict:
+    """Freeze a suite: write MANIFEST.json.  Refuses to re-freeze changed content in place."""
+    manifest = build_manifest(suite)
+    out = Path(suite.root) / "MANIFEST.json"
+    if out.exists() and not force:
+        old = json.loads(out.read_text())
+        if old.get("content_hash") != manifest["content_hash"]:
+            raise FileExistsError(
+                f"REFUSING: {out} exists with hash {old.get('content_hash')} != {manifest['content_hash']}.\n"
+                f"A frozen suite must not change in place — bump the version (new directory) or pass --force.")
+    out.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest

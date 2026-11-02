@@ -1,0 +1,77 @@
+{
+  "name": "crc_tools",
+  "version": "0.1",
+  "description": "Tool calling against a mock CRC surgery-risk model service (prediction, SHAP, kNN): can the model gather what the MDT needs through the API and report it without inventing numbers?",
+  "tasks": [
+    {
+      "name": "analysis_en",
+      "file": "analysis_en.jsonl",
+      "kind": "agent",
+      "description": "MDT analysis: prediction, SHAP drivers and similar patients from the surgery-risk service",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    },
+    {
+      "name": "analysis_it",
+      "file": "analysis_it.jsonl",
+      "kind": "agent",
+      "description": "MDT analysis: prediction, SHAP drivers and similar patients from the surgery-risk service",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    },
+    {
+      "name": "whatif_en",
+      "file": "whatif_en.jsonl",
+      "kind": "agent",
+      "description": "the patient's prediction and a counterfactual one through `overrides`",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    },
+    {
+      "name": "whatif_it",
+      "file": "whatif_it.jsonl",
+      "kind": "agent",
+      "description": "the patient's prediction and a counterfactual one through `overrides`",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    },
+    {
+      "name": "limits_en",
+      "file": "limits_en.jsonl",
+      "kind": "agent",
+      "description": "missing data, unknown patients and out-of-scope outcomes: report the limit, never a guessed number",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    },
+    {
+      "name": "limits_it",
+      "file": "limits_it.jsonl",
+      "kind": "agent",
+      "description": "missing data, unknown patients and out-of-scope outcomes: report the limit, never a guessed number",
+      "scoring": {
+        "system": "You are the assistant of a colorectal cancer multidisciplinary team (MDT). Through the tools you are connected to the hospital's surgery-risk model service: it estimates the probability that a rectal cancer patient will need TME surgery after total neoadjuvant therapy (TNT), explains the estimate and finds similar past patients.\nRules:\n- Every number you report must come from a tool result. Never estimate a probability yourself.\n- When you report a prediction, name the model version it came from.\n- If a tool returns an error or the data are insufficient, say so instead of guessing.\n- Use `overrides` only when the clinician asks for a what-if.\n- Reply to the clinician briefly, in plain text, in the language of their request.",
+        "max_turns": 10
+      }
+    }
+  ],
+  "meta": {
+    "status": "DRAFT: needs clinician review of the Italian phrasing and the framing",
+    "generator": "scripts/author_crc_tools.py",
+    "env": "mock_api.py",
+    "split_group_id": "-(en|it)-",
+    "acceptance": {
+      "*": 0.9,
+      "limits_*": 0.95
+    }
+  }
+}

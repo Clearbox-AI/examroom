@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-hf = ["torch", "transformers", "accelerate"]
+hf = ["torch", "transformers", "accelerate", "huggingface_hub"]
 anthropic = ["anthropic>=1"]
 openai = ["openai"]
 crc = ["pandas"]                  # suites/crc_pilot: tool_hard checkers execute pandas code in a subprocess

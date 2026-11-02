@@ -5,7 +5,10 @@ per-suite test code. A new suite gets this coverage the moment it is authored.
 - is frozen, and the MANIFEST hash matches the recomputed content hash
   (which covers suite-local checker files, so checker edits are caught)
 - every item that carries its own reference answer scores ~1.0 through the
-  real scorer (an echo backend) — the scorer must accept the ground truth
+  real scorer (an echo backend) — the scorer must accept the ground truth.
+  Agent items carry a reference trajectory in their target JSON ({"calls",
+  "final"}); a replay backend makes those calls one per turn against the
+  suite's mock API, then answers with the reference final text.
 """
 
 import json
@@ -42,20 +45,36 @@ def test_frozen_and_hash_matches(suite):
 class _Echo:
     supports_logprobs = False
     supports_generate = True
+    supports_tools = True
     out = ""
+    script: list = []
 
     def generate(self, prompt, max_tokens, temperature, n):
         return [self.out] * n
+
+    def chat(self, messages, tools, max_tokens, temperature):
+        done = sum(1 for m in messages if m["role"] == "tool")
+        if done < len(self.script):
+            c = self.script[done]
+            return {"content": "", "tool_calls": [{"id": f"ref_{done}", "name": c["tool"],
+                                                    "arguments": json.dumps(c["arguments"])}]}
+        return {"content": self.out, "tool_calls": []}
 
 
 def test_reference_answers_score_perfect(suite):
     be = _Echo()
     scores = []
     for t, it in suite.iter_items():
-        if it.kind not in (Kind.PROGRAM, Kind.NUMERIC, Kind.EXACT) or it.target is None:
+        if it.kind not in (Kind.PROGRAM, Kind.NUMERIC, Kind.EXACT, Kind.AGENT) or it.target is None:
             continue
+        if it.kind == Kind.AGENT:
+            ref = json.loads(it.target)
+            be.script, be.out = ref["calls"], ref["final"]
         # program targets are full documents (prompt + continuation); others are the answer itself
-        be.out = it.target[len(it.prompt):] if it.target.startswith(it.prompt) else it.target
+        elif it.target.startswith(it.prompt):
+            be.out = it.target[len(it.prompt):]
+        else:
+            be.out = it.target
         try:
             s, _, _ = score_item(it, t, be, root=suite.root)
         except ModuleNotFoundError as e:

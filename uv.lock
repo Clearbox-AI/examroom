@@ -211,6 +211,7 @@ dev = [
 ]
 hf = [
     { name = "accelerate" },
+    { name = "huggingface-hub" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -222,6 +223,7 @@ openai = [
 requires-dist = [
     { name = "accelerate", marker = "extra == 'hf'" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1" },
+    { name = "huggingface-hub", marker = "extra == 'hf'" },
     { name = "openai", marker = "extra == 'openai'" },
     { name = "pandas", marker = "extra == 'crc'" },
     { name = "pandas", marker = "extra == 'dev'" },

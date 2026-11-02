@@ -1,0 +1,110 @@
+{
+  "suite": "crc_tools",
+  "version": "0.1",
+  "content_hash": "bfc1b3f3d8d8887b",
+  "frozen_at": "2026-10-04T07:52:43+00:00",
+  "git_commit": "4432410e67b41f83750122fde9ebf551cb550007",
+  "n_items": 240,
+  "meta": {
+    "status": "DRAFT: needs clinician review of the Italian phrasing and the framing",
+    "generator": "scripts/author_crc_tools.py",
+    "env": "mock_api.py",
+    "split_group_id": "-(en|it)-",
+    "acceptance": {
+      "*": 0.9,
+      "limits_*": 0.95
+    }
+  },
+  "files": {
+    "analysis_en.jsonl": {
+      "task": "analysis_en",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    },
+    "analysis_it.jsonl": {
+      "task": "analysis_it",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    },
+    "whatif_en.jsonl": {
+      "task": "whatif_en",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    },
+    "whatif_it.jsonl": {
+      "task": "whatif_it",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    },
+    "limits_en.jsonl": {
+      "task": "limits_en",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    },
+    "limits_it.jsonl": {
+      "task": "limits_it",
+      "kind": "agent",
+      "n_items": 40,
+      "provenance": {
+        "template:scripts/author_crc_tools.py": 40
+      },
+      "seeds": [
+        9200
+      ],
+      "categories": {
+        "base": 20,
+        "hard": 20
+      }
+    }
+  }
+}

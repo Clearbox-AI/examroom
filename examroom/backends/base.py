@@ -14,7 +14,9 @@ class BackendInfo:
     dtype: str | None = None
     quantization: str | None = None
     device: str | None = None
-    n_params: int | None = None
+    n_params: int | None = None      # total parameters (what must fit in memory)
+    active_params: int | None = None # per-token parameters of an MoE model (what drives latency)
+    weights_mb: float | None = None  # weight footprint: GGUF file size, or HF memory footprint
     revision: str | None = None
     extra: dict = field(default_factory=dict)
 
@@ -80,7 +82,27 @@ class Backend(Protocol):
     def generate(self, prompt: str, max_tokens: int, temperature: float, n: int) -> list[str]:
         ...
 
+    # optional, for `agent` items (backends that set supports_tools = True):
+    # def chat(self, messages: list[dict], tools: list[dict], max_tokens: int, temperature: float) -> dict
+    #   messages in OpenAI chat format, tools MCP-style {"name", "description", "inputSchema"};
+    #   returns {"content": str, "tool_calls": [{"id", "name", "arguments": JSON string}]}
+
     def close(self) -> None: ...
+
+
+def strip_reasoning(text: str) -> str:
+    """The answer part of a generation from a thinking model.
+
+    Servers without a reasoning parser (and raw hf generation) return the thought
+    inline as `<think>…</think>answer`; some templates open the block in the prompt,
+    so only the closing tag appears.  A thought cut off by the token budget has no
+    answer at all, which must score as a failure rather than parse numbers out of
+    the reasoning."""
+    if "</think>" in text:
+        return text.rsplit("</think>", 1)[1].lstrip()
+    if text.lstrip().startswith("<think>"):
+        return ""
+    return text
 
 
 class Timer:

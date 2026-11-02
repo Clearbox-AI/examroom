@@ -1,0 +1,89 @@
+{
+  "name": "crc_clinician",
+  "version": "0.1",
+  "description": "Can a model serve as the clinician's interface to a rectal-cancer decision-support model? Record extraction, tool routing, multi-step tool use, faithful narration and grounded protocol QA, in English and Italian, all scored programmatically (RISE use case).",
+  "tasks": [
+    {
+      "name": "extract_en",
+      "file": "extract_en.jsonl",
+      "kind": "program",
+      "description": "free-text MRI/lab report -> patient record JSON (8 fields, partial credit) (English)",
+      "scoring": {}
+    },
+    {
+      "name": "extract_it",
+      "file": "extract_it.jsonl",
+      "kind": "program",
+      "description": "free-text MRI/lab report -> patient record JSON (8 fields, partial credit) (Italian)",
+      "scoring": {}
+    },
+    {
+      "name": "route_en",
+      "file": "route_en.jsonl",
+      "kind": "program",
+      "description": "clinician request -> one tool call with the right arguments, or a refusal (English)",
+      "scoring": {}
+    },
+    {
+      "name": "route_it",
+      "file": "route_it.jsonl",
+      "kind": "program",
+      "description": "clinician request -> one tool call with the right arguments, or a refusal (Italian)",
+      "scoring": {}
+    },
+    {
+      "name": "next_en",
+      "file": "next_en.jsonl",
+      "kind": "program",
+      "description": "conversation with tool results -> next turn: tool call, question back, or final answer (English)",
+      "scoring": {}
+    },
+    {
+      "name": "next_it",
+      "file": "next_it.jsonl",
+      "kind": "program",
+      "description": "conversation with tool results -> next turn: tool call, question back, or final answer (Italian)",
+      "scoring": {}
+    },
+    {
+      "name": "narrate_en",
+      "file": "narrate_en.jsonl",
+      "kind": "program",
+      "description": "tool results -> answer to the clinician; any number not in the conversation scores 0 (English)",
+      "scoring": {}
+    },
+    {
+      "name": "narrate_it",
+      "file": "narrate_it.jsonl",
+      "kind": "program",
+      "description": "tool results -> answer to the clinician; any number not in the conversation scores 0 (Italian)",
+      "scoring": {}
+    },
+    {
+      "name": "grounded_en",
+      "file": "grounded_en.jsonl",
+      "kind": "program",
+      "description": "question over site-protocol passages -> number + cited passages, or not_found (English)",
+      "scoring": {}
+    },
+    {
+      "name": "grounded_it",
+      "file": "grounded_it.jsonl",
+      "kind": "program",
+      "description": "question over site-protocol passages -> number + cited passages, or not_found (Italian)",
+      "scoring": {}
+    }
+  ],
+  "meta": {
+    "status": "draft: Italian phrasing and clinical framing need clinician review before v1.0",
+    "use_case": "RISE model/CLINICIAN_INTERFACE.md: local model as tool-orchestrating clinician interface",
+    "split_group_id": "-(en|it)-",
+    "acceptance": {
+      "route_*": 0.95,
+      "next_*": 0.9,
+      "narrate_*": 0.9,
+      "extract_*": 0.9,
+      "grounded_*": 0.9
+    }
+  }
+}
