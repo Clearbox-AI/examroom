@@ -9,7 +9,7 @@ from typing import Callable
 
 from examroom.backends.base import Backend
 from examroom.items import Suite
-from examroom.scoring import load_checker, score_item
+from examroom.scoring import checker_module, load_checker, score_item
 
 
 @dataclass
@@ -101,6 +101,8 @@ def run_suite(
         hook = getattr(load_checker(spec, suite.root), "preflight", None)
         if hook is not None:
             hook()
+    for spec in sorted({it.env for _, it in todo if it.env}):
+        checker_module(spec, suite.root)
 
     def one(t, it) -> ItemResult:
         t0 = time.perf_counter()

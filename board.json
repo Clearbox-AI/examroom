@@ -1,0 +1,15 @@
+{
+ "title": "examroom leaderboard",
+ "profiles": [
+  "nothink@1"
+ ],
+ "suites": [
+  {
+   "name": "crc_clinician-heldout",
+   "version": "1.0",
+   "hash": "2dd36a20ec6dd3f9",
+   "label": "CRC clinician interface",
+   "public": "hf://clearbox-ai/examroom-suites/crc_clinician_v1.0"
+  }
+ ]
+}

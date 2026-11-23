@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -154,7 +156,8 @@ def validate_suite(
 
 
 def _content_key(it) -> str:
-    return "\x1f".join([it.prompt, *(it.options or []), it.good or "", it.bad or "", it.target or ""])
+    fixture = json.dumps(it.fixture, sort_keys=True) if it.fixture else ""
+    return "\x1f".join([it.prompt, *(it.options or []), it.good or "", it.bad or "", it.target or "", fixture])
 
 
 def _check_conventions(task: Task, it, rep: Report) -> None:
